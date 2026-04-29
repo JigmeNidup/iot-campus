@@ -1,5 +1,5 @@
-pm2 start npm --name "campus" -- start
+pm2 start npm --name "iot" -- start
 
-pm2 stop "campus"
+pm2 stop "iot"
 
-pm2 restart "campus"
+pm2 restart "iot"
