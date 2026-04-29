@@ -55,7 +55,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 
 You have two options.
 
-**a) Pure SQL** - run [`database/setup.sql`](database/setup.sql) once as a Postgres superuser. It creates the `campusmap_admin` role, the `campusmap` database, all tables, indexes, and seeds the default admin (`admin@campusmap.com` / `admin123`) using `pgcrypto`'s bcrypt.
+**a) Pure SQL** - run `[database/setup.sql](database/setup.sql)` once as a Postgres superuser. It creates the `campusmap_admin` role, the `campusmap` database, all tables, indexes, and seeds the default admin (`admin@campusmap.com` / `admin123`) using `pgcrypto`'s bcrypt.
 
 ```powershell
 psql -U postgres -f database/setup.sql
@@ -75,7 +75,7 @@ This creates / migrates the tables and seeds the admin user via `bcryptjs`.
 npm run dev
 ```
 
-Open <http://localhost:3000>, click **Sign in**, and use:
+Open [http://localhost:3000](http://localhost:3000), click **Sign in**, and use:
 
 - **Email:** `admin@campusmap.com`
 - **Password:** `admin123`
@@ -84,15 +84,17 @@ Open <http://localhost:3000>, click **Sign in**, and use:
 
 ## Scripts
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the Next.js dev server (Turbopack) |
-| `npm run build` | Production build |
-| `npm run start` | Start the production server |
-| `npm run lint` | Run `next lint` |
-| `npm run typecheck` | Run `tsc --noEmit` |
-| `npm run db:setup` | Create / migrate tables and seed the admin user |
-| `npm run db:teardown` | Drop all tables (with confirmation) |
+
+| Command               | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `npm run dev`         | Start the Next.js dev server (Turbopack)        |
+| `npm run build`       | Production build                                |
+| `npm run start`       | Start the production server                     |
+| `npm run lint`        | Run `next lint`                                 |
+| `npm run typecheck`   | Run `tsc --noEmit`                              |
+| `npm run db:setup`    | Create / migrate tables and seed the admin user |
+| `npm run db:teardown` | Drop all tables (with confirmation)             |
+
 
 ---
 
@@ -186,12 +188,12 @@ Sessions are JWT (no DB session table). The JWT carries `id` and `role` for the 
 
 ## Production notes
 
-The included [`pm2_guide.txt`](pm2_guide.txt) shows the basic PM2 commands for running the app under PM2:
+The included `[pm2_guide.txt](pm2_guide.txt)` shows the basic PM2 commands for running the app under PM2:
 
 ```powershell
-pm2 start npm --name "campus" -- start
-pm2 stop "campus"
-pm2 restart "campus"
+pm2 start npm --name "iot" -- start
+pm2 stop "iot"
+pm2 restart "iot"
 ```
 
 Run `npm run build` first, then start under PM2.
