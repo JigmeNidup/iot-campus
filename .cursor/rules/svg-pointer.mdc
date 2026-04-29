@@ -37,6 +37,8 @@ Fix: stop propagation at the child:
 
 Already applied in: `MapOverlay` polygons, `EditorCanvas` polygons / handles, `MapControls`. Apply the same pattern when adding new clickable overlays.
 
+This applies equally to IoT overlays (device markers, sensor cards, import/export controls, toolbar buttons) in both dashboard and public map views.
+
 ## Right-click
 
 Context menu is suppressed at both the container and the SVG level via `onContextMenu={(e) => e.preventDefault()}`. Right-click is **not** a pan trigger.
