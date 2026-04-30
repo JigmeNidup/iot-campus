@@ -31,7 +31,7 @@ function publishMqtt(topic: string, payload: string) {
 
     client.once("connect", () => {
       clearTimeout(failTimer);
-      client.publish(topic, payload, (err?: Error) => {
+      client.publish(topic, payload, { qos: 1, retain: false }, (err?: Error) => {
         client.end(true);
         if (err) reject(err);
         else resolve();
@@ -109,7 +109,12 @@ export async function POST(req: Request) {
 
     const outcomes: Array<{ deviceId: string; topic: string; ok: boolean; error?: string }> = [];
     for (const device of devicesResult.rows) {
-      const otaTopic = `${device.mqtt_topic_prefix}/ota/update`;
+      const primaryTopic = `${device.mqtt_topic_prefix}/ota/update`;
+      const canonicalTopic = `campus/${mapId}/device/${device.id}/ota/update`;
+      const topics =
+        primaryTopic === canonicalTopic
+          ? [primaryTopic]
+          : [primaryTopic, canonicalTopic];
       const downloadUrl = `${origin}/api/ota/firmware/${firmwareBuildId}/download`;
       const payload = JSON.stringify({
         action: "update",
@@ -121,21 +126,37 @@ export async function POST(req: Request) {
       });
 
       try {
-        await publishMqtt(otaTopic, payload);
+        let delivered = 0;
+        for (const topic of topics) {
+          await publishMqtt(topic, payload);
+          delivered += 1;
+        }
         await query(
           `INSERT INTO ota_update_logs
            (map_id, device_id, firmware_build_id, triggered_by_user_id, status, detail)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [mapId, device.id, firmwareBuildId, session.user.id, "queued", "mqtt dispatched"],
+          [
+            mapId,
+            device.id,
+            firmwareBuildId,
+            session.user.id,
+            "queued",
+            `mqtt dispatched to ${delivered} topic(s): ${topics.join(", ")}`,
+          ],
         );
         await query(
           "UPDATE iot_devices SET ota_status = 'queued', updated_at = NOW() WHERE id = $1",
           [device.id],
         );
-        outcomes.push({ deviceId: device.id, topic: otaTopic, ok: true });
+        outcomes.push({ deviceId: device.id, topic: topics.join(" | "), ok: true });
       } catch (err) {
         const message = err instanceof Error ? err.message : "publish failed";
-        outcomes.push({ deviceId: device.id, topic: otaTopic, ok: false, error: message });
+        outcomes.push({
+          deviceId: device.id,
+          topic: topics.join(" | "),
+          ok: false,
+          error: message,
+        });
       }
     }
 
