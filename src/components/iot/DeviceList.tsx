@@ -154,6 +154,9 @@ function DeviceRow({
       </div>
 
       <div className="space-y-2">
+        {showOperatorControls ? (
+          <p className="text-sm font-medium leading-none">{device.name}</p>
+        ) : null}
         {!showOperatorControls ? (
           <>
             <Input

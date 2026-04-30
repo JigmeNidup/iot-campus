@@ -239,6 +239,8 @@ export function OperatorDashboard() {
               devices={mapOverlayDevices}
               selectedBuildingId={selectedBuildingId}
               selectedDeviceId={selectedDeviceId}
+              showDeviceLabels
+              showDeviceHoverTooltip
               placementType={null}
               onPlaceDevice={() => undefined}
               onMoveDevice={() => undefined}

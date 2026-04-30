@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Droplets, Lightbulb } from "lucide-react";
 import type { CampusMap, IotDevice } from "@/types";
 import { useMapTransform } from "@/hooks/useMapTransform";
@@ -20,6 +20,8 @@ interface IotMapViewProps {
   onCommitMoveDevice: (device: IotDevice) => void;
   onBuildingSelect: (buildingId: string | null) => void;
   onDeviceSelect: (deviceId: string | null) => void;
+  showDeviceLabels?: boolean;
+  showDeviceHoverTooltip?: boolean;
 }
 
 export function IotMapView({
@@ -33,6 +35,8 @@ export function IotMapView({
   onCommitMoveDevice,
   onBuildingSelect,
   onDeviceSelect,
+  showDeviceLabels = false,
+  showDeviceHoverTooltip = false,
 }: IotMapViewProps) {
   const { containerRef, svgRef, bindContainer, transform, view, zoomBy, resetView, screenToSvg } =
     useMapTransform({ initial: { x: 0, y: 0, scale: 1 } });
@@ -41,6 +45,13 @@ export function IotMapView({
     deviceId: string;
     offsetX: number;
     offsetY: number;
+  } | null>(null);
+  const [hoveredDevice, setHoveredDevice] = useState<{
+    name: string;
+    type: "light" | "water_valve" | "temp_humidity";
+    state: boolean;
+    clientX: number;
+    clientY: number;
   } | null>(null);
 
   return (
@@ -91,6 +102,16 @@ export function IotMapView({
                 key={device.id}
                 transform={`translate(${device.positionX} ${device.positionY})`}
                 className="pointer-events-auto"
+                onPointerEnter={(e) => {
+                  if (!showDeviceHoverTooltip) return;
+                  setHoveredDevice({
+                    name: device.name,
+                    type: device.type,
+                    state: device.state,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                  });
+                }}
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   onBuildingSelect(device.buildingId ?? null);
@@ -106,6 +127,26 @@ export function IotMapView({
                   e.currentTarget.setPointerCapture(e.pointerId);
                 }}
                 onPointerMove={(e) => {
+                  if (showDeviceHoverTooltip) {
+                    setHoveredDevice((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            name: device.name,
+                            type: device.type,
+                            state: device.state,
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                          }
+                        : {
+                            name: device.name,
+                            type: device.type,
+                            state: device.state,
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                          },
+                    );
+                  }
                   const drag = dragRef.current;
                   if (!drag || drag.pointerId !== e.pointerId || drag.deviceId !== device.id) return;
                   const [px, py] = screenToSvg(e.clientX, e.clientY);
@@ -122,6 +163,9 @@ export function IotMapView({
                 }}
                 onPointerCancel={() => {
                   dragRef.current = null;
+                }}
+                onPointerLeave={() => {
+                  setHoveredDevice(null);
                 }}
               >
                 <circle
@@ -141,6 +185,23 @@ export function IotMapView({
                     <Icon size={10 / view.scale} />
                   </div>
                 </foreignObject>
+                {showDeviceLabels ? (
+                  <text
+                    x={0}
+                    y={18 / view.scale}
+                    textAnchor="middle"
+                    dominantBaseline="hanging"
+                    fontSize={10 / view.scale}
+                    fontWeight={600}
+                    fill="#111827"
+                    stroke="white"
+                    strokeWidth={2 / view.scale}
+                    paintOrder="stroke"
+                    pointerEvents="none"
+                  >
+                    {device.name}
+                  </text>
+                ) : null}
               </g>
             );
           })}
@@ -162,6 +223,21 @@ export function IotMapView({
         onZoomOut={() => zoomBy(1 / 1.12)}
         onReset={resetView}
       />
+      {showDeviceHoverTooltip && hoveredDevice ? (
+        <div
+          className="pointer-events-none fixed z-50 rounded-md bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
+          style={{
+            left: hoveredDevice.clientX + 12,
+            top: hoveredDevice.clientY + 12,
+          }}
+        >
+          <div className="font-medium">{hoveredDevice.name}</div>
+          <div className="text-muted-foreground">
+            {hoveredDevice.type === "light" ? "Light" : "Water Valve"} -{" "}
+            {hoveredDevice.state ? "ON" : "OFF"}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
