@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Campus Map - Project Context
 
-Full-stack interactive campus map. Admin uploads a map image, draws building polygons over it in the editor, attaches metadata, and publishes a public read-only view. The app also includes IoT device management overlays (lights, water valves, and one global temp/humidity sensor per map) with MQTT realtime updates.
+Full-stack interactive campus map. Admin uploads a map image, draws building polygons over it in the editor, attaches metadata, and publishes a public read-only view. The app also includes IoT device management overlays (lights, water valves, and one global temp/humidity sensor per map) with MQTT realtime updates plus a programming dashboard for firmware generation and OTA lifecycle management.
 
 ## Stack
 
@@ -17,13 +17,14 @@ Full-stack interactive campus map. Admin uploads a map image, draws building pol
 - **Zod** for validation (`src/lib/validators.ts`)
 - **Sonner** for toasts, **dnd-kit** for reordering
 - **MQTT.js** browser client for realtime IoT topics
+- Node MQTT publish support for server-side OTA trigger dispatch
 
 ## Route groups
 
 - `(auth)` - `/login` (public)
-- `(dashboard)` - `/dashboard`, `/editor`, `/editor/[mapId]`, `/dashboard/iot` (auth-guarded by `src/middleware.ts`)
+- `(dashboard)` - `/dashboard`, `/editor`, `/editor/[mapId]`, `/dashboard/iot`, `/dashboard/programming` (auth-guarded by `src/middleware.ts`)
 - `(display)` - `/map/[mapId]` (public, only when `is_published`; includes IoT read-only overlays + sensor card)
-- API: `auth/[...nextauth]`, `maps`, `maps/[id]`, `maps/[id]/devices`, `upload`, `files/[id]`
+- API: `auth/[...nextauth]`, `maps`, `maps/[id]`, `maps/[id]/devices`, `ota/*`, `iot/register/*`, `iot/ota/ack`, `upload`, `files/[id]`
 
 ## Conventions
 
@@ -31,5 +32,6 @@ Full-stack interactive campus map. Admin uploads a map image, draws building pol
 - All DB columns are `snake_case`; the app uses `camelCase`. Use the mappers in `src/lib/utils.ts` (`mapRowToCampusMap`, `mapRowToBuilding`) - never read raw rows in components.
 - New building / map / IoT fields must be added in **all** of: SQL (`database/setup.sql` + idempotent `ALTER TABLE` in `scripts/setup-db.ts`), row + app types in `src/lib/utils.ts`/`src/types/index.ts`, Zod schemas, and API `INSERT/UPDATE` statements.
 - IoT types are `light`, `water_valve`, and `temp_humidity`; enforce one `temp_humidity` sensor per map in API logic.
+- OTA additions require schema + setup script + teardown + types/mappers + validators + API route parity. Firmware metadata lives in `firmware_builds`, device runtime OTA state lives on `iot_devices`, and push audit logs live in `ota_update_logs`.
 - Uploads go to `./uploads/` (project root, not `public/`) and are served via `GET /api/files/[id]`.
 - Use `next/image` with `unoptimized` for `/api/files/...` URLs.

@@ -41,7 +41,15 @@ async function main() {
   const client = await pool.connect();
 
   try {
-    const tables = ["iot_devices", "buildings", "campus_maps", "users"];
+    const tables = [
+      "iot_device_logs",
+      "ota_update_logs",
+      "firmware_builds",
+      "iot_devices",
+      "buildings",
+      "campus_maps",
+      "users",
+    ];
     for (const table of tables) {
       console.log(`${c.cyan}> dropping ${table}${c.reset}`);
       await client.query(`DROP TABLE IF EXISTS ${client.escapeIdentifier(table)} CASCADE`);

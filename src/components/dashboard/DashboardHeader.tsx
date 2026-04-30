@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { Cpu, LogOut, Plus, ShieldUser, User as UserIcon } from "lucide-react";
+import { Code2, Cpu, LogOut, Plus, ShieldUser, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +55,12 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 <Link href="/dashboard/users">
                   <ShieldUser className="size-4" />
                   Users
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/dashboard/programming">
+                  <Code2 className="size-4" />
+                  Programming
                 </Link>
               </Button>
               <Button asChild size="sm">

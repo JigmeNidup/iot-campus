@@ -59,8 +59,27 @@ export interface IotDevice {
   positionX: number;
   positionY: number;
   mqttTopicPrefix: string;
+  boardTarget?: "esp32" | "esp01" | null;
+  firmwareVersion?: string | null;
+  wifiSsid?: string | null;
+  otaStatus?: string | null;
+  lastSeenAt?: string | null;
+  registrationToken?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface FirmwareBuild {
+  id: string;
+  deviceType: "light" | "water_valve" | "temp_humidity";
+  boardTarget: "esp32" | "esp01";
+  version: string;
+  filePath: string;
+  checksum: string;
+  sizeBytes: number;
+  changelog?: string | null;
+  createdByUserId: string;
+  createdAt: string;
 }
 
 export type EditorTool = "select" | "polygon" | "rectangle" | "pan";

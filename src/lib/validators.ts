@@ -163,6 +163,14 @@ export const updateDeviceSchema = deviceSchema
     temperature: true,
     humidity: true,
   })
+  .extend({
+    boardTarget: z.enum(["esp32", "esp01"]).optional().nullable(),
+    firmwareVersion: z.string().max(100).optional().nullable(),
+    wifiSsid: z.string().max(255).optional().nullable(),
+    otaStatus: z.string().max(50).optional().nullable(),
+    lastSeenAt: z.string().datetime().optional().nullable(),
+    registrationToken: z.string().max(255).optional().nullable(),
+  })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required",
@@ -191,6 +199,54 @@ export const updateUserSchema = z
   });
 
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+
+export const firmwareBuildSchema = z.object({
+  deviceType: z.enum(["light", "water_valve", "temp_humidity"]),
+  boardTarget: z.enum(["esp32", "esp01"]),
+  version: z.string().min(1).max(100),
+  changelog: z.string().max(5000).optional().nullable(),
+  originalFileName: z.string().min(1).max(255).optional(),
+  binaryBase64: z.string().min(1),
+});
+
+export const otaPushSchema = z.object({
+  mapId: z.string().uuid(),
+  deviceIds: z.array(z.string().uuid()).min(1).max(1),
+  firmwareBuildId: z.string().uuid(),
+});
+
+export const deviceBootLogSchema = z.object({
+  mapId: z.string().uuid(),
+  deviceId: z.string().uuid(),
+  state: z.boolean(),
+  firmwareVersion: z.string().min(1).max(100),
+  wifiSsid: z.string().max(255).optional().nullable(),
+  mqttTopicPrefix: z.string().min(1).max(255).optional().nullable(),
+  boardTarget: z.enum(["esp32", "esp01"]).optional().nullable(),
+});
+
+export const registerStartSchema = z.object({
+  mapId: z.string().uuid(),
+  deviceId: z.string().uuid(),
+  boardTarget: z.enum(["esp32", "esp01"]),
+});
+
+export const registerCompleteSchema = z.object({
+  mapId: z.string().uuid(),
+  deviceId: z.string().uuid(),
+  registrationToken: z.string().min(8).max(255),
+  boardTarget: z.enum(["esp32", "esp01"]),
+  wifiSsid: z.string().max(255),
+  mqttTopicPrefix: z.string().min(1).max(255),
+  firmwareVersion: z.string().min(1).max(100),
+});
+
+export const otaAckSchema = z.object({
+  deviceId: z.string().uuid(),
+  mapId: z.string().uuid(),
+  status: z.enum(["queued", "downloading", "flashing", "success", "failed"]),
+  detail: z.string().max(2000).optional(),
+});
 
 export const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   "image/png",

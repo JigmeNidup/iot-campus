@@ -101,6 +101,30 @@ export async function PUT(req: Request, { params }: RouteContext) {
       updates.push(`humidity = $${p++}`);
       values.push(data.humidity);
     }
+    if (data.boardTarget !== undefined) {
+      updates.push(`board_target = $${p++}`);
+      values.push(data.boardTarget);
+    }
+    if (data.firmwareVersion !== undefined) {
+      updates.push(`firmware_version = $${p++}`);
+      values.push(data.firmwareVersion);
+    }
+    if (data.wifiSsid !== undefined) {
+      updates.push(`wifi_ssid = $${p++}`);
+      values.push(data.wifiSsid);
+    }
+    if (data.otaStatus !== undefined) {
+      updates.push(`ota_status = $${p++}`);
+      values.push(data.otaStatus);
+    }
+    if (data.lastSeenAt !== undefined) {
+      updates.push(`last_seen_at = $${p++}`);
+      values.push(data.lastSeenAt);
+    }
+    if (data.registrationToken !== undefined) {
+      updates.push(`registration_token = $${p++}`);
+      values.push(data.registrationToken);
+    }
     updates.push("updated_at = NOW()");
 
     values.push(deviceId, id);

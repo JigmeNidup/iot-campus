@@ -108,6 +108,54 @@ const SCHEMA_STATEMENTS: { label: string; sql: string }[] = [
     `,
   },
   {
+    label: "create firmware_builds table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS firmware_builds (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        device_type VARCHAR(50) NOT NULL CHECK (device_type IN ('light', 'water_valve', 'temp_humidity')),
+        board_target VARCHAR(20) NOT NULL CHECK (board_target IN ('esp32', 'esp01')),
+        version VARCHAR(100) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        checksum VARCHAR(128) NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        changelog TEXT,
+        created_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `,
+  },
+  {
+    label: "create ota_update_logs table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS ota_update_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        map_id UUID NOT NULL REFERENCES campus_maps(id) ON DELETE CASCADE,
+        device_id UUID NOT NULL REFERENCES iot_devices(id) ON DELETE CASCADE,
+        firmware_build_id UUID NOT NULL REFERENCES firmware_builds(id) ON DELETE CASCADE,
+        triggered_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(50) NOT NULL DEFAULT 'queued',
+        detail TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `,
+  },
+  {
+    label: "create iot_device_logs table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS iot_device_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        map_id UUID NOT NULL REFERENCES campus_maps(id) ON DELETE CASCADE,
+        device_id UUID NOT NULL REFERENCES iot_devices(id) ON DELETE CASCADE,
+        event_type VARCHAR(50) NOT NULL,
+        state BOOLEAN,
+        firmware_version VARCHAR(100),
+        detail TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `,
+  },
+  {
     label: "ensure buildings.locked column (idempotent migration)",
     sql: `ALTER TABLE buildings ADD COLUMN IF NOT EXISTS locked BOOLEAN NOT NULL DEFAULT false`,
   },
@@ -128,6 +176,30 @@ const SCHEMA_STATEMENTS: { label: string; sql: string }[] = [
     sql: `ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS humidity FLOAT`,
   },
   {
+    label: "ensure iot_devices.board_target column (idempotent migration)",
+    sql: `ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS board_target VARCHAR(20)`,
+  },
+  {
+    label: "ensure iot_devices.firmware_version column (idempotent migration)",
+    sql: `ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS firmware_version VARCHAR(100)`,
+  },
+  {
+    label: "ensure iot_devices.wifi_ssid column (idempotent migration)",
+    sql: `ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS wifi_ssid VARCHAR(255)`,
+  },
+  {
+    label: "ensure iot_devices.ota_status column (idempotent migration)",
+    sql: `ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS ota_status VARCHAR(50)`,
+  },
+  {
+    label: "ensure iot_devices.last_seen_at column (idempotent migration)",
+    sql: `ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`,
+  },
+  {
+    label: "ensure iot_devices.registration_token column (idempotent migration)",
+    sql: `ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS registration_token VARCHAR(255)`,
+  },
+  {
     label: "create idx_campus_maps_user_id",
     sql: `CREATE INDEX IF NOT EXISTS idx_campus_maps_user_id ON campus_maps(user_id)`,
   },
@@ -146,6 +218,26 @@ const SCHEMA_STATEMENTS: { label: string; sql: string }[] = [
   {
     label: "create idx_iot_devices_building_id",
     sql: `CREATE INDEX IF NOT EXISTS idx_iot_devices_building_id ON iot_devices(building_id)`,
+  },
+  {
+    label: "create idx_firmware_builds_device_board_version",
+    sql: `CREATE INDEX IF NOT EXISTS idx_firmware_builds_device_board_version ON firmware_builds(device_type, board_target, version)`,
+  },
+  {
+    label: "create idx_ota_update_logs_device_id",
+    sql: `CREATE INDEX IF NOT EXISTS idx_ota_update_logs_device_id ON ota_update_logs(device_id)`,
+  },
+  {
+    label: "create idx_ota_update_logs_map_id",
+    sql: `CREATE INDEX IF NOT EXISTS idx_ota_update_logs_map_id ON ota_update_logs(map_id)`,
+  },
+  {
+    label: "create idx_iot_device_logs_device_id",
+    sql: `CREATE INDEX IF NOT EXISTS idx_iot_device_logs_device_id ON iot_device_logs(device_id)`,
+  },
+  {
+    label: "create idx_iot_device_logs_map_id",
+    sql: `CREATE INDEX IF NOT EXISTS idx_iot_device_logs_map_id ON iot_device_logs(map_id)`,
   },
 ];
 

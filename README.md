@@ -20,6 +20,7 @@ Built with **Next.js 16 (App Router)**, **TypeScript** (strict mode), **Tailwind
 - File uploads (PNG / JPG / SVG, up to 25 MB) served through a custom API route so they survive production builds
 - Copy-link button on the dashboard for any published map
 - IoT device management dashboard (`/dashboard/iot`) with map overlays, drag-to-move, lock/unlock, and inline editing
+- Programming dashboard (`/dashboard/programming`) for per-device ESP firmware generation and OTA lifecycle controls
 - Public map IoT display for unauthenticated users with live MQTT status updates and marker hover details
 - Global per-map `temp_humidity` sensor (one per map) with editor and public display cards
 - Import / export IoT devices as JSON (replace or append mode)
@@ -104,12 +105,15 @@ Open [http://localhost:3000](http://localhost:3000), click **Sign in**, and use:
 src/
   app/
     (auth)/           # /login (public)
-    (dashboard)/      # /dashboard, /editor, /editor/[mapId], /dashboard/iot (auth-guarded)
+    (dashboard)/      # /dashboard, /editor, /editor/[mapId], /dashboard/iot, /dashboard/programming (auth-guarded)
     (display)/        # /map/[mapId]   (public, only when published; includes IoT read-only layer)
     api/
       auth/[...nextauth]/   # NextAuth route handler
       maps/                 # CRUD + transactional building updates
       maps/[id]/devices     # IoT device CRUD for owned maps
+      ota/                  # Firmware upload/list/download + OTA push APIs
+      iot/register/*        # Device provisioning registration APIs
+      iot/ota/ack           # Device OTA status ack API
       upload/               # Multipart upload to ./uploads/
       files/[id]/           # Reads ./uploads/ and streams the file
   components/
@@ -159,9 +163,21 @@ public/
   - `locked` prevents moving overlays
   - ON/OFF toggling remains available from device list
 - Device data is persisted in PostgreSQL `iot_devices`, and map/public UIs both use DB state as initial source of truth.
+- OTA lifecycle fields are tracked per device: board target, firmware version, registration token, OTA status, and last seen timestamp.
 - Real-time updates:
   - editor dashboard and public map subscribe to map wildcard status topic (`campus/{mapId}/device/+/status`)
   - clients update in-memory device state on incoming MQTT payloads.
+
+### OTA lifecycle
+
+- Lifecycle flow:
+  - initial base firmware flash
+  - AP provisioning on device (SSID/password/topic)
+  - registration completion call to app API
+  - OTA push trigger from dashboard over MQTT
+  - device downloads `.bin` from app HTTP OTA endpoint and flashes
+- Firmware artifacts are stored in `uploads/firmware` and indexed in `firmware_builds`.
+- OTA pushes are audit-logged in `ota_update_logs`.
 
 ---
 

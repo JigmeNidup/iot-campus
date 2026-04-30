@@ -114,8 +114,53 @@ CREATE TABLE IF NOT EXISTS iot_devices (
     position_x FLOAT NOT NULL,
     position_y FLOAT NOT NULL,
     mqtt_topic_prefix VARCHAR(255) NOT NULL,
+    board_target VARCHAR(20) CHECK (board_target IN ('esp32', 'esp01')),
+    firmware_version VARCHAR(100),
+    wifi_ssid VARCHAR(255),
+    ota_status VARCHAR(50),
+    last_seen_at TIMESTAMPTZ,
+    registration_token VARCHAR(255),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ---- firmware_builds ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS firmware_builds (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_type VARCHAR(50) NOT NULL CHECK (device_type IN ('light', 'water_valve', 'temp_humidity')),
+    board_target VARCHAR(20) NOT NULL CHECK (board_target IN ('esp32', 'esp01')),
+    version VARCHAR(100) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    checksum VARCHAR(128) NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    changelog TEXT,
+    created_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ---- ota_update_logs ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ota_update_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    map_id UUID NOT NULL REFERENCES campus_maps(id) ON DELETE CASCADE,
+    device_id UUID NOT NULL REFERENCES iot_devices(id) ON DELETE CASCADE,
+    firmware_build_id UUID NOT NULL REFERENCES firmware_builds(id) ON DELETE CASCADE,
+    triggered_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL DEFAULT 'queued',
+    detail TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ---- iot_device_logs ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS iot_device_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    map_id UUID NOT NULL REFERENCES campus_maps(id) ON DELETE CASCADE,
+    device_id UUID NOT NULL REFERENCES iot_devices(id) ON DELETE CASCADE,
+    event_type VARCHAR(50) NOT NULL,
+    state BOOLEAN,
+    firmware_version VARCHAR(100),
+    detail TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 
@@ -125,6 +170,12 @@ ALTER TABLE buildings ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
 ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS locked BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS temperature FLOAT;
 ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS humidity FLOAT;
+ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS board_target VARCHAR(20);
+ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS firmware_version VARCHAR(100);
+ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS wifi_ssid VARCHAR(255);
+ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS ota_status VARCHAR(50);
+ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+ALTER TABLE iot_devices ADD COLUMN IF NOT EXISTS registration_token VARCHAR(255);
 
 
 -- ---- indexes -----------------------------------------------------------------
@@ -133,6 +184,11 @@ CREATE INDEX IF NOT EXISTS idx_buildings_map_id    ON buildings(map_id);
 CREATE INDEX IF NOT EXISTS idx_buildings_category  ON buildings(category);
 CREATE INDEX IF NOT EXISTS idx_iot_devices_map_id ON iot_devices(map_id);
 CREATE INDEX IF NOT EXISTS idx_iot_devices_building_id ON iot_devices(building_id);
+CREATE INDEX IF NOT EXISTS idx_firmware_builds_device_board_version ON firmware_builds(device_type, board_target, version);
+CREATE INDEX IF NOT EXISTS idx_ota_update_logs_device_id ON ota_update_logs(device_id);
+CREATE INDEX IF NOT EXISTS idx_ota_update_logs_map_id ON ota_update_logs(map_id);
+CREATE INDEX IF NOT EXISTS idx_iot_device_logs_device_id ON iot_device_logs(device_id);
+CREATE INDEX IF NOT EXISTS idx_iot_device_logs_map_id ON iot_device_logs(map_id);
 
 
 -- ---- default administrator ---------------------------------------------------
@@ -157,6 +213,9 @@ ALTER TABLE users        OWNER TO campusmap_admin;
 ALTER TABLE campus_maps  OWNER TO campusmap_admin;
 ALTER TABLE buildings    OWNER TO campusmap_admin;
 ALTER TABLE iot_devices  OWNER TO campusmap_admin;
+ALTER TABLE firmware_builds OWNER TO campusmap_admin;
+ALTER TABLE ota_update_logs OWNER TO campusmap_admin;
+ALTER TABLE iot_device_logs OWNER TO campusmap_admin;
 
 -- Default privileges for any future objects created by `postgres` in `public`.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public

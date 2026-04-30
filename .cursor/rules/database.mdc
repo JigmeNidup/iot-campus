@@ -27,13 +27,14 @@ For multi-step writes (e.g. updating a map + replacing all its buildings) use `g
 1. **`database/setup.sql`** - the source-of-truth one-shot script (creates role, db, tables, seeds admin via pgcrypto).
 2. **`scripts/setup-db.ts`** - the same schema, idempotent, plus `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` blocks for migrations.
 
-When you add a column, update **both** files, the row types in `src/lib/utils.ts` (`BuildingRow` / `CampusMapRow` / `IotDeviceRow` as applicable), corresponding mappers, Zod schemas in `src/lib/validators.ts`, and API `INSERT` / `UPDATE` statements.
+When you add a column, update **both** files, the row types in `src/lib/utils.ts` (`BuildingRow` / `CampusMapRow` / `IotDeviceRow` / `FirmwareBuildRow` as applicable), corresponding mappers, Zod schemas in `src/lib/validators.ts`, and API `INSERT` / `UPDATE` statements.
 
 ## Mapper rule
 
 API routes return camelCase JSON. Use `mapRowToBuilding` / `mapRowToCampusMap`. Never expose raw `row.snake_case` to a client component.
 
 For IoT routes, also use `mapRowToIotDevice`.
+For OTA firmware metadata routes, use `mapRowToFirmwareBuild`.
 
 ## Building INSERT order
 
@@ -42,3 +43,9 @@ The `INSERT INTO buildings` columns in `src/app/api/maps/[id]/route.ts` must lis
 ## IoT singleton sensor rule
 
 The global `temp_humidity` sensor is a singleton per map. Enforce this in map-device `POST` API logic with a parameterized query check before insert.
+
+## OTA schema notes
+
+- OTA firmware binaries are indexed in `firmware_builds`.
+- Per-device OTA runtime state (board target, firmware version, registration token, ota status, last seen) lives in `iot_devices`.
+- Push attempts/results are written to `ota_update_logs`.

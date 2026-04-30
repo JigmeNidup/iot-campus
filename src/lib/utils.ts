@@ -78,11 +78,36 @@ export type IotDeviceRow = {
   position_x: number | string;
   position_y: number | string;
   mqtt_topic_prefix: string;
+  board_target: "esp32" | "esp01" | null;
+  firmware_version: string | null;
+  wifi_ssid: string | null;
+  ota_status: string | null;
+  last_seen_at: Date | string | null;
+  registration_token: string | null;
   created_at: Date | string;
   updated_at: Date | string;
 };
 
-import type { Building, BuildingCategory, CampusMap, IotDevice } from "@/types";
+export type FirmwareBuildRow = {
+  id: string;
+  device_type: "light" | "water_valve" | "temp_humidity";
+  board_target: "esp32" | "esp01";
+  version: string;
+  file_path: string;
+  checksum: string;
+  size_bytes: number;
+  changelog: string | null;
+  created_by_user_id: string;
+  created_at: Date | string;
+};
+
+import type {
+  Building,
+  BuildingCategory,
+  CampusMap,
+  FirmwareBuild,
+  IotDevice,
+} from "@/types";
 
 export function mapRowToCampusMap(
   row: CampusMapRow,
@@ -158,6 +183,17 @@ export function mapRowToIotDevice(row: IotDeviceRow): IotDevice {
     positionY:
       typeof row.position_y === "string" ? parseFloat(row.position_y) : row.position_y,
     mqttTopicPrefix: row.mqtt_topic_prefix,
+    boardTarget: row.board_target,
+    firmwareVersion: row.firmware_version,
+    wifiSsid: row.wifi_ssid,
+    otaStatus: row.ota_status,
+    lastSeenAt:
+      row.last_seen_at == null
+        ? null
+        : row.last_seen_at instanceof Date
+          ? row.last_seen_at.toISOString()
+          : row.last_seen_at,
+    registrationToken: row.registration_token,
     createdAt:
       row.created_at instanceof Date
         ? row.created_at.toISOString()
@@ -166,5 +202,21 @@ export function mapRowToIotDevice(row: IotDeviceRow): IotDevice {
       row.updated_at instanceof Date
         ? row.updated_at.toISOString()
         : row.updated_at,
+  };
+}
+
+export function mapRowToFirmwareBuild(row: FirmwareBuildRow): FirmwareBuild {
+  return {
+    id: row.id,
+    deviceType: row.device_type,
+    boardTarget: row.board_target,
+    version: row.version,
+    filePath: row.file_path,
+    checksum: row.checksum,
+    sizeBytes: row.size_bytes,
+    changelog: row.changelog,
+    createdByUserId: row.created_by_user_id,
+    createdAt:
+      row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
   };
 }
