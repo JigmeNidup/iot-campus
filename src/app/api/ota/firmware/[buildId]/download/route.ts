@@ -34,12 +34,17 @@ export async function GET(_req: Request, { params }: RouteContext) {
     }
 
     const buffer = await fs.readFile(filePath);
+    const safeName = path.basename(row.file_path).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const downloadName = safeName.toLowerCase().endsWith(".bin")
+      ? safeName
+      : `${safeName}.bin`;
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/octet-stream",
         "Cache-Control": "no-store",
         "Content-Length": String(buffer.byteLength),
+        "Content-Disposition": `attachment; filename="${downloadName}"`,
         "X-Firmware-Sha256": row.checksum,
       },
     });
