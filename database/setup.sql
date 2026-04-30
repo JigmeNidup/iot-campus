@@ -21,11 +21,11 @@
 -- Section 1 :: role + database  (run as superuser, e.g. `postgres`)
 -- =============================================================================
 
-CREATE USER iot_campusmap_admin WITH PASSWORD 'mypassword';
+CREATE USER iot_iot_campusmap_admin WITH PASSWORD 'mypassword';
 
 CREATE DATABASE iot_campusmap
     WITH
-    OWNER = iot_campusmap_admin
+    OWNER = iot_iot_campusmap_admin
     ENCODING = 'UTF8'
     LOCALE_PROVIDER = 'libc'
     CONNECTION LIMIT = -1
@@ -40,9 +40,9 @@ CREATE DATABASE iot_campusmap
 -- Section 2 :: schema  (runs inside the `campusmap` database)
 -- =============================================================================
 
--- Allow campusmap_admin to create objects inside the public schema
+-- Allow iot_campusmap_admin to create objects inside the public schema
 -- (Postgres 15+ locked this down by default).
-GRANT USAGE, CREATE ON SCHEMA public TO campusmap_admin;
+GRANT USAGE, CREATE ON SCHEMA public TO iot_campusmap_admin;
 
 -- pgcrypto provides:
 --   * gen_random_uuid() for primary keys
@@ -209,16 +209,16 @@ ON CONFLICT (email) DO NOTHING;
 -- ---- ownership ---------------------------------------------------------------
 -- If you ran this whole file as the `postgres` superuser, the tables above are
 -- owned by `postgres`. Hand them over to the application role so it can write.
-ALTER TABLE users        OWNER TO campusmap_admin;
-ALTER TABLE campus_maps  OWNER TO campusmap_admin;
-ALTER TABLE buildings    OWNER TO campusmap_admin;
-ALTER TABLE iot_devices  OWNER TO campusmap_admin;
-ALTER TABLE firmware_builds OWNER TO campusmap_admin;
-ALTER TABLE ota_update_logs OWNER TO campusmap_admin;
-ALTER TABLE iot_device_logs OWNER TO campusmap_admin;
+ALTER TABLE users        OWNER TO iot_campusmap_admin;
+ALTER TABLE campus_maps  OWNER TO iot_campusmap_admin;
+ALTER TABLE buildings    OWNER TO iot_campusmap_admin;
+ALTER TABLE iot_devices  OWNER TO iot_campusmap_admin;
+ALTER TABLE firmware_builds OWNER TO iot_campusmap_admin;
+ALTER TABLE ota_update_logs OWNER TO iot_campusmap_admin;
+ALTER TABLE iot_device_logs OWNER TO iot_campusmap_admin;
 
 -- Default privileges for any future objects created by `postgres` in `public`.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT ALL ON TABLES    TO campusmap_admin;
+    GRANT ALL ON TABLES    TO iot_campusmap_admin;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT ALL ON SEQUENCES TO campusmap_admin;
+    GRANT ALL ON SEQUENCES TO iot_campusmap_admin;
