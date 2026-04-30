@@ -653,7 +653,10 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
       if (!res.ok) throw new Error(data.error || "Failed to push OTA update");
       const failed = (data.outcomes ?? []).filter((o: { ok: boolean }) => !o.ok);
       if (failed.length > 0) {
-        toast.error(`OTA push partial failure (${failed.length})`);
+        const first = failed[0] as { topic?: string; error?: string };
+        toast.error(
+          `OTA publish failed (${failed.length}). ${first?.error || "Unknown error"}${first?.topic ? ` | topic: ${first.topic}` : ""}`,
+        );
       } else {
         toast.success("OTA push queued");
       }

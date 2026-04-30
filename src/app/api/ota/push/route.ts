@@ -13,10 +13,24 @@ function isAdmin(role?: string) {
 }
 
 function publishMqtt(topic: string, payload: string) {
-  const broker = process.env.MQTT_PUSH_BROKER_URL || "mqtt://broker.hivemq.com:1883";
+  // In hosted/serverless environments raw TCP 1883 is often blocked.
+  // Prefer secure websocket broker URL unless explicitly overridden.
+  const broker =
+    process.env.MQTT_PUSH_BROKER_URL || "wss://broker.hivemq.com:8884/mqtt";
   return new Promise<void>((resolve, reject) => {
-    const client = mqtt.connect(broker, { reconnectPeriod: 0, connectTimeout: 10000 });
+    const client = mqtt.connect(broker, {
+      reconnectPeriod: 0,
+      connectTimeout: 10000,
+      protocolVersion: 4,
+      clean: true,
+    });
+    const failTimer = setTimeout(() => {
+      client.end(true);
+      reject(new Error("MQTT connect timeout"));
+    }, 12000);
+
     client.once("connect", () => {
+      clearTimeout(failTimer);
       client.publish(topic, payload, (err?: Error) => {
         client.end(true);
         if (err) reject(err);
@@ -24,6 +38,7 @@ function publishMqtt(topic: string, payload: string) {
       });
     });
     client.once("error", (err: Error) => {
+      clearTimeout(failTimer);
       client.end(true);
       reject(err);
     });
