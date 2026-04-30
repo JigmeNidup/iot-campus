@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import mqtt from "mqtt";
 import { auth } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { createOtaToken } from "@/lib/ota";
 import { otaPushSchema } from "@/lib/validators";
 import type { IotDeviceRow, FirmwareBuildRow } from "@/lib/utils";
 
@@ -95,13 +94,8 @@ export async function POST(req: Request) {
 
     const outcomes: Array<{ deviceId: string; topic: string; ok: boolean; error?: string }> = [];
     for (const device of devicesResult.rows) {
-      const token = createOtaToken({
-        buildId: firmwareBuildId,
-        deviceId: device.id,
-        expiresAt: Date.now() + 10 * 60 * 1000,
-      });
       const otaTopic = `${device.mqtt_topic_prefix}/ota/update`;
-      const downloadUrl = `${origin}/api/ota/firmware/${firmwareBuildId}/download?token=${encodeURIComponent(token)}`;
+      const downloadUrl = `${origin}/api/ota/firmware/${firmwareBuildId}/download`;
       const payload = JSON.stringify({
         action: "update",
         url: downloadUrl,

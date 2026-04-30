@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { query } from "@/lib/db";
-import { OTA_UPLOAD_DIR, verifyOtaToken } from "@/lib/ota";
+import { OTA_UPLOAD_DIR } from "@/lib/ota";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,20 +12,10 @@ const UUID_RE =
 
 type RouteContext = { params: Promise<{ buildId: string }> };
 
-export async function GET(req: Request, { params }: RouteContext) {
+export async function GET(_req: Request, { params }: RouteContext) {
   const { buildId } = await params;
   if (!UUID_RE.test(buildId)) {
     return NextResponse.json({ error: "Invalid build id" }, { status: 400 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const token = searchParams.get("token");
-  if (!token) {
-    return NextResponse.json({ error: "Missing token" }, { status: 401 });
-  }
-  const payload = verifyOtaToken(token);
-  if (!payload || payload.buildId !== buildId) {
-    return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
   }
 
   try {

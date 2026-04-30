@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { createOtaToken } from "@/lib/ota";
 import type { FirmwareBuildRow, IotDeviceRow } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -79,13 +78,7 @@ export async function POST(req: Request) {
         ? `${forwardedProto || reqUrl.protocol.replace(":", "")}://${host}`
         : `${reqUrl.protocol}//${reqUrl.host}`);
 
-    const expiresAt = Date.now() + 10 * 60 * 1000;
-    const token = createOtaToken({
-      buildId: input.firmwareBuildId,
-      deviceId: input.deviceId,
-      expiresAt,
-    });
-    const downloadUrl = `${origin}/api/ota/firmware/${input.firmwareBuildId}/download?token=${encodeURIComponent(token)}`;
+    const downloadUrl = `${origin}/api/ota/firmware/${input.firmwareBuildId}/download`;
 
     const payload = {
       action: "update",
@@ -102,7 +95,6 @@ export async function POST(req: Request) {
         broker,
         topic: otaTopic,
         origin,
-        tokenExpiresAt: new Date(expiresAt).toISOString(),
         compatibility: {
           deviceTypeMatchesBuild: device.type === build.device_type,
           boardTargetMatchesBuild:

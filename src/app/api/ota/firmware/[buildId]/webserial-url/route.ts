@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { createOtaToken } from "@/lib/ota";
 
 export const dynamic = "force-dynamic";
 
@@ -27,14 +26,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
     return NextResponse.json({ error: "Invalid build id" }, { status: 400 });
   }
 
-  const token = createOtaToken({
-    buildId,
-    // for webserial manual flashing this is a dummy marker id
-    deviceId: "00000000-0000-0000-0000-000000000000",
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
-
   const origin = process.env.NEXTAUTH_URL || "http://localhost:3004";
-  const url = `${origin}/api/ota/firmware/${buildId}/download?token=${encodeURIComponent(token)}`;
+  const url = `${origin}/api/ota/firmware/${buildId}/download`;
   return NextResponse.json({ url });
 }

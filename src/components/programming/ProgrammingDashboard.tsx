@@ -56,7 +56,6 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
     broker: string;
     topic: string;
     origin: string;
-    tokenExpiresAt: string;
     compatibility: {
       deviceTypeMatchesBuild: boolean;
       boardTargetMatchesBuild: boolean;
@@ -1156,10 +1155,6 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Origin:</span> {otaDiagnostics.origin}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Token expires:</span>{" "}
-                      {new Date(otaDiagnostics.tokenExpiresAt).toLocaleString()}
                     </div>
                     <div className="flex gap-2">
                       <Badge
