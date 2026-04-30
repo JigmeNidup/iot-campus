@@ -21,7 +21,7 @@ interface DeviceListProps {
   selectedDeviceId?: string | null;
   onSelectDevice?: (deviceId: string | null) => void;
   onToggle: (device: IotDevice, nextState: boolean) => void;
-  onToggleLock: (device: IotDevice, nextLocked: boolean) => void;
+  onToggleLock?: (device: IotDevice, nextLocked: boolean) => void;
   onUpdate: (
     device: IotDevice,
     patch: {
@@ -32,7 +32,8 @@ interface DeviceListProps {
       buildingId?: string | null;
     },
   ) => void;
-  onDelete: (device: IotDevice) => void;
+  onDelete?: (device: IotDevice) => void;
+  mode?: "default" | "operator";
 }
 
 export function DeviceList({
@@ -43,6 +44,7 @@ export function DeviceList({
   onToggleLock,
   onUpdate,
   onDelete,
+  mode = "default",
 }: DeviceListProps) {
   if (devices.length === 0) {
     return (
@@ -64,6 +66,7 @@ export function DeviceList({
           onToggleLock={onToggleLock}
           onUpdate={onUpdate}
           onDelete={onDelete}
+          mode={mode}
         />
       ))}
     </div>
@@ -78,12 +81,13 @@ function DeviceRow({
   onToggleLock,
   onUpdate,
   onDelete,
+  mode,
 }: {
   device: IotDevice;
   isSelected: boolean;
   onSelect: () => void;
   onToggle: (device: IotDevice, nextState: boolean) => void;
-  onToggleLock: (device: IotDevice, nextLocked: boolean) => void;
+  onToggleLock?: (device: IotDevice, nextLocked: boolean) => void;
   onUpdate: (
     device: IotDevice,
     patch: {
@@ -94,11 +98,13 @@ function DeviceRow({
       buildingId?: string | null;
     },
   ) => void;
-  onDelete: (device: IotDevice) => void;
+  onDelete?: (device: IotDevice) => void;
+  mode: "default" | "operator";
 }) {
   const [name, setName] = useState(device.name);
   const [type, setType] = useState<"light" | "water_valve" | "temp_humidity">(device.type);
 
+  const showOperatorControls = mode === "operator";
   const dirty = useMemo(
     () => name.trim() !== device.name || type !== device.type,
     [name, type, device.name, device.type],
@@ -134,68 +140,74 @@ function DeviceRow({
           >
             {device.state ? "Turn Off" : "Turn On"}
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onToggleLock(device, !device.locked)}
-            aria-label={device.locked ? "Unlock" : "Lock"}
-          >
-            {device.locked ? <Lock className="size-4" /> : <LockOpen className="size-4" />}
-          </Button>
+          {!showOperatorControls ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => onToggleLock?.(device, !device.locked)}
+              aria-label={device.locked ? "Unlock" : "Lock"}
+            >
+              {device.locked ? <Lock className="size-4" /> : <LockOpen className="size-4" />}
+            </Button>
+          ) : null}
         </div>
       </div>
 
       <div className="space-y-2">
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Device name"
-          maxLength={255}
-        />
-        <div className="flex items-center gap-2">
-          <Select value={type} onValueChange={(v) => setType(v as "light" | "water_valve" | "temp_humidity")}>
-            <SelectTrigger className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="light">Light</SelectItem>
-              <SelectItem value="water_valve">Water Valve</SelectItem>
-              <SelectItem value="temp_humidity">Temp/Humidity Sensor</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            size="icon"
-            variant="outline"
-            disabled={!dirty || name.trim().length === 0}
-            onClick={() => onUpdate(device, { name: name.trim(), type })}
-            aria-label="Save device changes"
-          >
-            <Save className="size-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(device.mqttTopicPrefix);
-                toast.success("MQTT topic copied");
-              } catch {
-                toast.error("Failed to copy topic");
-              }
-            }}
-            aria-label="Copy MQTT topic"
-          >
-            <Copy className="size-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onDelete(device)}
-            aria-label="Delete device"
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </div>
+        {!showOperatorControls ? (
+          <>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Device name"
+              maxLength={255}
+            />
+            <div className="flex items-center gap-2">
+              <Select value={type} onValueChange={(v) => setType(v as "light" | "water_valve" | "temp_humidity")}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Light</SelectItem>
+                  <SelectItem value="water_valve">Water Valve</SelectItem>
+                  <SelectItem value="temp_humidity">Temp/Humidity Sensor</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="icon"
+                variant="outline"
+                disabled={!dirty || name.trim().length === 0}
+                onClick={() => onUpdate(device, { name: name.trim(), type })}
+                aria-label="Save device changes"
+              >
+                <Save className="size-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(device.mqttTopicPrefix);
+                    toast.success("MQTT topic copied");
+                  } catch {
+                    toast.error("Failed to copy topic");
+                  }
+                }}
+                aria-label="Copy MQTT topic"
+              >
+                <Copy className="size-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onDelete?.(device)}
+                aria-label="Delete device"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          </>
+        ) : null}
         <p className="text-xs text-muted-foreground">
           x: {device.positionX.toFixed(1)} , y: {device.positionY.toFixed(1)}
         </p>

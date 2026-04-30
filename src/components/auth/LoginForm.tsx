@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ import { loginSchema, type LoginInput } from "@/lib/validators";
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") || "/dashboard";
+  const callbackUrl = params.get("callbackUrl");
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -54,8 +54,11 @@ export function LoginForm() {
         return;
       }
 
+      const session = await getSession();
+      const fallbackByRole =
+        session?.user?.role === "operator" ? "/operator" : "/dashboard";
       toast.success("Signed in");
-      router.push(callbackUrl);
+      router.push(callbackUrl || fallbackByRole);
       router.refresh();
     } catch (err) {
       console.error(err);
@@ -70,7 +73,7 @@ export function LoginForm() {
       <CardHeader>
         <CardTitle>Sign in</CardTitle>
         <CardDescription>
-          Use your administrator credentials to manage campus maps.
+          Sign in with your admin or operator account.
         </CardDescription>
       </CardHeader>
       <Form {...form}>

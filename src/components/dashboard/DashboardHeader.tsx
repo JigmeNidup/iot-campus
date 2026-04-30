@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { Cpu, LogOut, Plus, User as UserIcon } from "lucide-react";
+import { Cpu, LogOut, Plus, ShieldUser, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,15 +16,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface DashboardHeaderProps {
-  user: { name?: string | null; email?: string | null };
+  user: { name?: string | null; email?: string | null; role?: string | null };
 }
 
 export function DashboardHeader({ user }: DashboardHeaderProps) {
+  const isAdmin = user.role === "admin";
+  const isOperator = user.role === "operator";
+  const homeHref = isOperator ? "/operator" : "/dashboard";
+
   return (
     <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-14 items-center justify-between px-6">
         <Link
-          href="/dashboard"
+          href={homeHref}
           className="flex items-center gap-2 font-semibold"
         >
           <Image
@@ -39,18 +43,36 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
         </Link>
 
         <div className="flex items-center gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/iot">
-              <Cpu className="size-4" />
-              IoT
-            </Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/editor">
-              <Plus className="size-4" />
-              New map
-            </Link>
-          </Button>
+          {isAdmin ? (
+            <>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/dashboard/iot">
+                  <Cpu className="size-4" />
+                  IoT
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/dashboard/users">
+                  <ShieldUser className="size-4" />
+                  Users
+                </Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/editor">
+                  <Plus className="size-4" />
+                  New map
+                </Link>
+              </Button>
+            </>
+          ) : null}
+          {isOperator ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href="/operator">
+                <Cpu className="size-4" />
+                Operator
+              </Link>
+            </Button>
+          ) : null}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -66,6 +88,9 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </span>
                   <span className="text-xs text-muted-foreground truncate">
                     {user.email}
+                  </span>
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {user.role ?? "admin"}
                   </span>
                 </div>
               </DropdownMenuLabel>

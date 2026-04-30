@@ -170,6 +170,28 @@ export const updateDeviceSchema = deviceSchema
 
 export type UpdateDeviceInput = z.infer<typeof updateDeviceSchema>;
 
+export const createUserSchema = z.object({
+  name: z.string().min(1).max(255),
+  email: z.string().email().max(255),
+  password: z.string().min(6).max(128),
+  role: z.enum(["admin", "operator"]),
+});
+
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+
+export const updateUserSchema = z
+  .object({
+    name: z.string().min(1).max(255).optional(),
+    email: z.string().email().max(255).optional(),
+    password: z.string().min(6).max(128).optional(),
+    role: z.enum(["admin", "operator"]).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required",
+  });
+
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+
 export const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",

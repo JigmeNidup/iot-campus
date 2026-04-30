@@ -13,7 +13,11 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
-        user={{ name: session.user.name, email: session.user.email }}
+        user={{
+          name: session.user.name,
+          email: session.user.email,
+          role: session.user.role,
+        }}
       />
       <main className="flex-1">{children}</main>
     </div>

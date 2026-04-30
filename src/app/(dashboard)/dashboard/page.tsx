@@ -15,6 +15,7 @@ export const metadata = { title: "Dashboard - Campus Map" };
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+  if (session.user.role === "operator") redirect("/operator");
 
   const { rows } = await query<CampusMapRow>(
     "SELECT * FROM campus_maps WHERE user_id = $1 ORDER BY created_at DESC",
