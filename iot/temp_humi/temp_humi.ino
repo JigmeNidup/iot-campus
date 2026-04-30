@@ -164,9 +164,13 @@ void connectMqtt() {
     String body = "";
     for (unsigned int i = 0; i < length; i++) body += (char)payload[i];
     if (t == otaTopic()) {
-      int idx = body.indexOf("\"downloadUrl\":\"");
+      int idx = body.indexOf("\"url\":\"");
+      int start = idx + 7;
+      if (idx < 0) {
+        idx = body.indexOf("\"downloadUrl\":\"");
+        start = idx + 15;
+      }
       if (idx < 0) return;
-      int start = idx + 15;
       int end = body.indexOf("\"", start);
       if (end <= start) return;
       String url = body.substring(start, end);

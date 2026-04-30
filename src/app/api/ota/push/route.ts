@@ -103,8 +103,10 @@ export async function POST(req: Request) {
       const otaTopic = `${device.mqtt_topic_prefix}/ota/update`;
       const downloadUrl = `${origin}/api/ota/firmware/${firmwareBuildId}/download?token=${encodeURIComponent(token)}`;
       const payload = JSON.stringify({
-        buildId: firmwareBuildId,
+        action: "update",
+        url: downloadUrl,
         version: fw.version,
+        buildId: firmwareBuildId,
         checksum: fw.checksum,
         downloadUrl,
       });

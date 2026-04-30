@@ -51,6 +51,25 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
   const [deletingBuildId, setDeletingBuildId] = useState<string | null>(null);
   const [firmwareFilterType, setFirmwareFilterType] = useState<DeviceTypeFilter>("all");
   const [pushing, setPushing] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [otaDiagnostics, setOtaDiagnostics] = useState<{
+    broker: string;
+    topic: string;
+    origin: string;
+    tokenExpiresAt: string;
+    compatibility: {
+      deviceTypeMatchesBuild: boolean;
+      boardTargetMatchesBuild: boolean;
+    };
+    payload: {
+      action: string;
+      url: string;
+      version: string;
+      buildId: string;
+      checksum: string;
+      downloadUrl: string;
+    };
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const mqttRef = useRef<MqttClient | null>(null);
   const [serialSupported, setSerialSupported] = useState(false);
@@ -646,6 +665,33 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
     }
   }
 
+  async function runOtaDiagnostics() {
+    if (!selectedMapId || !selectedBuildId || !selectedDevice) {
+      toast.error("Select map, device and firmware build first");
+      return;
+    }
+    setDiagnosing(true);
+    try {
+      const res = await fetch("/api/ota/diagnostics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mapId: selectedMapId,
+          deviceId: selectedDevice.id,
+          firmwareBuildId: selectedBuildId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to run OTA diagnostics");
+      setOtaDiagnostics(data.diagnostics ?? null);
+      toast.success("OTA diagnostics generated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to run OTA diagnostics");
+    } finally {
+      setDiagnosing(false);
+    }
+  }
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
       <div className="flex flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
@@ -1082,6 +1128,73 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                 <div className="text-xs text-muted-foreground">
                   Base lifecycle: initial base firmware flash {"->"} AP registration {"->"} OTA update via MQTT trigger + HTTP firmware download.
                 </div>
+              </div>
+
+              <div className="rounded-lg border bg-background p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-medium">OTA diagnostics</div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={diagnosing || !selectedDevice || !selectedBuildId}
+                    onClick={() => void runOtaDiagnostics()}
+                  >
+                    {diagnosing ? "Running..." : "Run diagnostics"}
+                  </Button>
+                </div>
+                {!otaDiagnostics ? (
+                  <div className="text-xs text-muted-foreground">
+                    Run diagnostics to inspect broker/topic/payload and download URL used for OTA.
+                  </div>
+                ) : (
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Broker:</span> {otaDiagnostics.broker}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Topic:</span> {otaDiagnostics.topic}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Origin:</span> {otaDiagnostics.origin}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Token expires:</span>{" "}
+                      {new Date(otaDiagnostics.tokenExpiresAt).toLocaleString()}
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge
+                        variant={
+                          otaDiagnostics.compatibility.deviceTypeMatchesBuild
+                            ? "default"
+                            : "destructive"
+                        }
+                      >
+                        Type match:{" "}
+                        {otaDiagnostics.compatibility.deviceTypeMatchesBuild
+                          ? "OK"
+                          : "Mismatch"}
+                      </Badge>
+                      <Badge
+                        variant={
+                          otaDiagnostics.compatibility.boardTargetMatchesBuild
+                            ? "default"
+                            : "destructive"
+                        }
+                      >
+                        Board match:{" "}
+                        {otaDiagnostics.compatibility.boardTargetMatchesBuild
+                          ? "OK"
+                          : "Mismatch"}
+                      </Badge>
+                    </div>
+                    <div className="rounded-md border bg-muted/30 p-2">
+                      <div className="mb-1 text-muted-foreground">MQTT payload preview</div>
+                      <pre className="overflow-auto whitespace-pre-wrap break-all">
+                        {JSON.stringify(otaDiagnostics.payload, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
