@@ -65,8 +65,11 @@ export async function POST(req: Request) {
 
     const device = deviceResult.rows[0];
     const build = buildResult.rows[0];
-    const broker = process.env.MQTT_PUSH_BROKER_URL || "mqtt://broker.hivemq.com:1883";
-    const otaTopic = `${device.mqtt_topic_prefix}/ota/update`;
+    const broker =
+      process.env.MQTT_PUSH_BROKER_URL || "wss://broker.hivemq.com:8884/mqtt";
+    const canonicalTopic = `campus/${input.mapId}/device/${input.deviceId}/ota/update`;
+    const dbTopic = `${device.mqtt_topic_prefix}/ota/update`;
+    const topics = canonicalTopic === dbTopic ? [canonicalTopic] : [canonicalTopic, dbTopic];
 
     const reqUrl = new URL(req.url);
     const forwardedProto = req.headers.get("x-forwarded-proto");
@@ -93,7 +96,8 @@ export async function POST(req: Request) {
       ok: true,
       diagnostics: {
         broker,
-        topic: otaTopic,
+        topic: canonicalTopic,
+        topics,
         origin,
         compatibility: {
           deviceTypeMatchesBuild: device.type === build.device_type,

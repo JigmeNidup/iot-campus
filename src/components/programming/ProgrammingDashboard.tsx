@@ -18,7 +18,12 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { MqttClient } from "mqtt";
-import { connectMqttClient, disconnectMqttClient, subscribeToTopic } from "@/lib/mqtt-client";
+import {
+  connectMqttClient,
+  disconnectMqttClient,
+  publishCommand,
+  subscribeToTopic,
+} from "@/lib/mqtt-client";
 
 interface ProgrammingDashboardProps {
   maps: { id: string; name: string }[];
@@ -55,6 +60,7 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
   const [otaDiagnostics, setOtaDiagnostics] = useState<{
     broker: string;
     topic: string;
+    topics?: string[];
     origin: string;
     compatibility: {
       deviceTypeMatchesBuild: boolean;
@@ -640,26 +646,52 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
     }
     setPushing(true);
     try {
-      const res = await fetch("/api/ota/push", {
+      const diagRes = await fetch("/api/ota/diagnostics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mapId: selectedMapId,
           deviceIds: [deviceId],
+          deviceId,
           firmwareBuildId: selectedBuildId,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to push OTA update");
-      const failed = (data.outcomes ?? []).filter((o: { ok: boolean }) => !o.ok);
-      if (failed.length > 0) {
-        const first = failed[0] as { topic?: string; error?: string };
-        toast.error(
-          `OTA publish failed (${failed.length}). ${first?.error || "Unknown error"}${first?.topic ? ` | topic: ${first.topic}` : ""}`,
-        );
-      } else {
-        toast.success("OTA push queued");
+      const diagData = await diagRes.json();
+      if (!diagRes.ok) throw new Error(diagData.error || "Failed to prepare OTA payload");
+
+      const diagnostics = diagData.diagnostics as {
+        broker: string;
+        topic: string;
+        topics?: string[];
+        payload: {
+          action: string;
+          url: string;
+          version: string;
+          buildId: string;
+          checksum: string;
+          downloadUrl: string;
+        };
+      };
+
+      const client = mqttRef.current ?? connectMqttClient(diagnostics.broker);
+      mqttRef.current = client;
+      const topics = diagnostics.topics?.length ? diagnostics.topics : [diagnostics.topic];
+      const payload = JSON.stringify(diagnostics.payload);
+      for (const topic of topics) {
+        await publishCommand(client, topic, payload);
       }
+
+      await fetch("/api/ota/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mapId: selectedMapId,
+          deviceId,
+          firmwareBuildId: selectedBuildId,
+          detail: `mqtt dispatched from frontend to ${topics.join(", ")}`,
+        }),
+      });
+      toast.success("OTA trigger published from frontend");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to push OTA update");
     } finally {
