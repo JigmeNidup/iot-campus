@@ -28,6 +28,7 @@ String deviceId;
 String topicPrefix;
 String firmwareVersion = "v1.0.0";
 bool configured = false;
+bool bootStatusSent = false;
 unsigned long lastPublishMs = 0;
 
 String commandTopic() { return topicPrefix + "/command"; }
@@ -200,7 +201,7 @@ void setup() {
   }
   completeRegistration();
   connectMqtt();
-  sendBootStatusLog();
+  bootStatusSent = sendBootStatusLog();
 }
 
 void loop() {
@@ -211,6 +212,9 @@ void loop() {
   if (WiFi.status() != WL_CONNECTED) connectWifi();
   if (!mqttClient.connected()) connectMqtt();
   mqttClient.loop();
+  if (!bootStatusSent && WiFi.status() == WL_CONNECTED) {
+    bootStatusSent = sendBootStatusLog();
+  }
 
   if (millis() - lastPublishMs >= 5000) {
     lastPublishMs = millis();

@@ -27,6 +27,7 @@ String topicPrefix;
 String firmwareVersion = "v1.0.0";
 bool configured = false;
 bool lightState = false;
+bool bootStatusSent = false;
 unsigned long lastStatusPublishMs = 0;
 
 void setLight(bool on) {
@@ -201,7 +202,7 @@ void setup() {
   registerComplete();
   connectMqtt();
   publishStatus();
-  sendBootStatusLog();
+  bootStatusSent = sendBootStatusLog();
   lastStatusPublishMs = millis();
 }
 
@@ -213,6 +214,9 @@ void loop() {
   if (WiFi.status() != WL_CONNECTED) connectWifi();
   if (!mqttClient.connected()) connectMqtt();
   mqttClient.loop();
+  if (!bootStatusSent && WiFi.status() == WL_CONNECTED) {
+    bootStatusSent = sendBootStatusLog();
+  }
   if (millis() - lastStatusPublishMs > 30000) {
     publishStatus();
     lastStatusPublishMs = millis();
