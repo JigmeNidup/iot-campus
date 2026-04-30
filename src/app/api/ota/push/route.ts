@@ -56,6 +56,15 @@ export async function POST(req: Request) {
   }
   const { mapId, deviceIds, firmwareBuildId } = parsed.data;
   const targetDeviceId = deviceIds[0];
+  const reqUrl = new URL(req.url);
+  const forwardedProto = req.headers.get("x-forwarded-proto");
+  const forwardedHost = req.headers.get("x-forwarded-host");
+  const host = forwardedHost || req.headers.get("host");
+  const origin =
+    process.env.NEXTAUTH_URL ||
+    (host
+      ? `${forwardedProto || reqUrl.protocol.replace(":", "")}://${host}`
+      : `${reqUrl.protocol}//${reqUrl.host}`);
 
   try {
     const mapCheck = await query<{ id: string }>(
@@ -92,7 +101,7 @@ export async function POST(req: Request) {
         expiresAt: Date.now() + 10 * 60 * 1000,
       });
       const otaTopic = `${device.mqtt_topic_prefix}/ota/update`;
-      const downloadUrl = `${process.env.NEXTAUTH_URL ?? "http://localhost:3004"}/api/ota/firmware/${firmwareBuildId}/download?token=${encodeURIComponent(token)}`;
+      const downloadUrl = `${origin}/api/ota/firmware/${firmwareBuildId}/download?token=${encodeURIComponent(token)}`;
       const payload = JSON.stringify({
         buildId: firmwareBuildId,
         version: fw.version,

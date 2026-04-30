@@ -134,9 +134,14 @@ bool sendBootStatusLog() {
 
 void performOta(const String& url) {
   WiFiClient client;
-  ESPhttpUpdate.rebootOnUpdate(true);
+  ESPhttpUpdate.rebootOnUpdate(false);
+  mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"flashing\"}", false);
   t_httpUpdate_return ret = ESPhttpUpdate.update(client, url);
-  if (ret != HTTP_UPDATE_OK) {
+  if (ret == HTTP_UPDATE_OK) {
+    mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"success\"}", false);
+    delay(300);
+    ESP.restart();
+  } else {
     mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"failed\"}", false);
   }
 }

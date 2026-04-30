@@ -398,6 +398,15 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
       try {
         const parsed = JSON.parse(payload.toString()) as { status?: string };
         if (!parsed.status) return;
+        void fetch("/api/iot/ota/ack", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mapId: selectedMapId,
+            deviceId,
+            status: parsed.status,
+          }),
+        });
         setDevices((prev) =>
           prev.map((d) =>
             d.id === deviceId
