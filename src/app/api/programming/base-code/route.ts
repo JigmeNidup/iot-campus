@@ -18,7 +18,13 @@ function resolveFirmwarePath(deviceType: DeviceType, board: BoardTarget) {
       : deviceType === "water_valve"
         ? board === "esp32"
           ? path.join("iot", "water_valve", "water_valve.ino")
-          : path.join("iot", "water_valve", "water_valve.ino")
+          : path.join(
+              "iot",
+              "water_valve",
+              "esp01",
+              "water_valve_esp01",
+              "water_valve_esp01.ino",
+            )
         : board === "esp32"
           ? path.join("iot", "temp_humi", "temp_humi.ino")
           : path.join("iot", "temp_humi", "esp01", "temp_humi_esp01", "temp_humi_esp01.ino");

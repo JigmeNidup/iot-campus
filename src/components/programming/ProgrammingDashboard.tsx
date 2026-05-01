@@ -838,7 +838,7 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
           <div className="ml-auto">
             <Tabs value={tab} onValueChange={(v) => setTab(v as ProgrammingTab)}>
               <TabsList>
-                <TabsTrigger value="code">Code</TabsTrigger>
+                <TabsTrigger value="code">Test</TabsTrigger>
                 <TabsTrigger value="base">Base</TabsTrigger>
                 <TabsTrigger value="firmware">Firmware</TabsTrigger>
                 <TabsTrigger value="ota">OTA</TabsTrigger>
@@ -1092,7 +1092,7 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
             <div className="rounded-lg border bg-background">
               <div className="flex items-center justify-between border-b px-4 py-2">
                 <div className="text-sm font-medium">
-                  {selectedDevice!.name} - {board.toUpperCase()} firmware
+                  {selectedDevice!.name} - {board.toUpperCase()} test sketch
                 </div>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="ghost" onClick={() => setCodeWrap((v) => !v)}>
@@ -1107,12 +1107,12 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                     variant="outline"
                     onClick={() =>
                       downloadText(
-                        `${selectedDevice!.name.replaceAll(" ", "-")}-${board}.ino`,
+                        `${selectedDevice!.name.replaceAll(" ", "-")}-${board}-test.ino`,
                         generatedCode,
                       )
                     }
                   >
-                    Download .ino
+                    Download test .ino
                   </Button>
                 </div>
               </div>
@@ -1769,10 +1769,78 @@ function actuatorEsp01(
   commandTopic: string,
   statusTopic: string,
 ) {
-  const pin = 2;
-  return actuatorEsp32(type, ssid, password, clientId, commandTopic, statusTopic)
-    .replace("#include <WiFi.h>", "#include <ESP8266WiFi.h>")
-    .replace(`static const int CONTROL_PIN = ${type === "light" ? 2 : 4};`, `static const int CONTROL_PIN = ${pin};`);
+  // ESP-01 relay boards commonly use GPIO0 and are often active-low.
+  const pin = 0;
+  return [
+    "#include <ESP8266WiFi.h>",
+    "#include <PubSubClient.h>",
+    "",
+    `static const char* DEVICE_TYPE = "${type}";`,
+    `static const char* WIFI_SSID = "${esc(ssid)}";`,
+    `static const char* WIFI_PASSWORD = "${esc(password)}";`,
+    'static const char* MQTT_BROKER = "broker.hivemq.com";',
+    "static const uint16_t MQTT_PORT = 1883;",
+    `static const char* MQTT_CLIENT_ID = "${clientId}";`,
+    `static const char* MQTT_CMD_TOPIC = "${commandTopic}";`,
+    `static const char* MQTT_STATUS_TOPIC = "${statusTopic}";`,
+    `static const int CONTROL_PIN = ${pin};`,
+    "static const bool ACTIVE_LOW = true;",
+    "",
+    "WiFiClient wifiClient;",
+    "PubSubClient mqttClient(wifiClient);",
+    "bool deviceState = false;",
+    "",
+    "void setDevice(bool on) {",
+    "  deviceState = on;",
+    "  if (ACTIVE_LOW) digitalWrite(CONTROL_PIN, on ? LOW : HIGH);",
+    "  else digitalWrite(CONTROL_PIN, on ? HIGH : LOW);",
+    "}",
+    "",
+    "void publishStatus() {",
+    "  char payload[80];",
+    '  snprintf(payload, sizeof(payload), "{\\"type\\":\\"%s\\",\\"state\\":%s}", DEVICE_TYPE, deviceState ? "true" : "false");',
+    "  mqttClient.publish(MQTT_STATUS_TOPIC, payload, false);",
+    "}",
+    "",
+    "void callback(char* topic, byte* payload, unsigned int length) {",
+    '  String body = "";',
+    "  for (unsigned int i = 0; i < length; i++) body += (char)payload[i];",
+    "  if (body.indexOf(\"\\\"state\\\":true\") >= 0 || body == \"ON\") setDevice(true);",
+    "  else if (body.indexOf(\"\\\"state\\\":false\") >= 0 || body == \"OFF\") setDevice(false);",
+    "  publishStatus();",
+    "}",
+    "",
+    "void connectWifi() {",
+    "  WiFi.mode(WIFI_STA);",
+    "  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);",
+    "  while (WiFi.status() != WL_CONNECTED) delay(500);",
+    "}",
+    "",
+    "void connectMqtt() {",
+    "  mqttClient.setServer(MQTT_BROKER, MQTT_PORT);",
+    "  mqttClient.setCallback(callback);",
+    "  while (!mqttClient.connected()) {",
+    "    if (mqttClient.connect(MQTT_CLIENT_ID)) {",
+    "      mqttClient.subscribe(MQTT_CMD_TOPIC);",
+    "      publishStatus();",
+    "    } else delay(2000);",
+    "  }",
+    "}",
+    "",
+    "void setup() {",
+    "  pinMode(CONTROL_PIN, OUTPUT);",
+    "  setDevice(false);",
+    "  connectWifi();",
+    "  connectMqtt();",
+    "}",
+    "",
+    "void loop() {",
+    "  if (WiFi.status() != WL_CONNECTED) connectWifi();",
+    "  if (!mqttClient.connected()) connectMqtt();",
+    "  mqttClient.loop();",
+    "}",
+    "",
+  ].join("\n");
 }
 
 function tempHumiEsp32(
