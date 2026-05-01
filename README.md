@@ -187,6 +187,9 @@ public/
 - **Provisioning trigger**: on-device provisioning AP can be forced by **3 resets within ~3 seconds**.
   - This **does not erase** stored WiFi/topic settings; the stored config is only overwritten when you submit new values in the AP portal.
   - The reset counter is cleared when AP mode is entered, so **resetting while in AP mode returns to normal boot** (unless you triple-reset again).
+  - Implementation detail:
+    - **ESP32**: uses `Preferences` (namespace `"rst"`, key `"cnt"`) as a boot counter that auto-clears after ~3 seconds of uptime.
+    - **ESP-01**: uses a single EEPROM byte at address **1023** as the same boot counter (auto-clears after ~3 seconds of uptime).
 - **Firmware version**:
   - Starts at **`v1.0.0`** by default.
   - Updated and persisted **only after a successful OTA** (using the `version` field from the OTA command payload).
