@@ -87,9 +87,6 @@ export async function POST(req: Request) {
       action: "update",
       url: downloadUrl,
       version: build.version,
-      buildId: input.firmwareBuildId,
-      checksum: build.checksum,
-      downloadUrl,
     };
 
     return NextResponse.json({

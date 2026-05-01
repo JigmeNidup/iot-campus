@@ -3,6 +3,8 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 #include <EEPROM.h>
+// ESP-01 RAM is tight — 1200 still fits typical OTA URL + checksum JSON payload.
+#define MQTT_MAX_PACKET_SIZE 1200
 #include <PubSubClient.h>
 
 static const char* DEVICE_TYPE = "light";

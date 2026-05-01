@@ -3,6 +3,8 @@
 #include <Preferences.h>
 #include <HTTPClient.h>
 #include <Update.h>
+// OTA JSON includes long HTTPS URLs — default PubSubClient buffer (256B) drops larger messages.
+#define MQTT_MAX_PACKET_SIZE 2048
 #include <PubSubClient.h>
 
 static const char* DEVICE_TYPE = "light";

@@ -3,6 +3,7 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 #include <EEPROM.h>
+#define MQTT_MAX_PACKET_SIZE 1200
 #include <PubSubClient.h>
 #include <DHT.h>
 

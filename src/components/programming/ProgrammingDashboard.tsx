@@ -70,9 +70,6 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
       action: string;
       url: string;
       version: string;
-      buildId: string;
-      checksum: string;
-      downloadUrl: string;
     };
   } | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -651,7 +648,6 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mapId: selectedMapId,
-          deviceIds: [deviceId],
           deviceId,
           firmwareBuildId: selectedBuildId,
         }),
@@ -667,9 +663,6 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
           action: string;
           url: string;
           version: string;
-          buildId: string;
-          checksum: string;
-          downloadUrl: string;
         };
       };
 
