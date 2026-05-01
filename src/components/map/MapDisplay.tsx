@@ -30,12 +30,13 @@ import {
 
 interface MapDisplayProps {
   map: CampusMap;
-  initialDevices: IotDevice[];
+  initialDevices?: IotDevice[];
+  showIot?: boolean;
 }
 
 const PUBLIC_BROKER_URL = "wss://broker.hivemq.com:8884/mqtt";
 
-export function MapDisplay({ map, initialDevices }: MapDisplayProps) {
+export function MapDisplay({ map, initialDevices = [], showIot = true }: MapDisplayProps) {
   const {
     transform,
     containerRef,
@@ -72,6 +73,7 @@ export function MapDisplay({ map, initialDevices }: MapDisplayProps) {
   }, [initialDevices, map.id]);
 
   useEffect(() => {
+    if (!showIot) return;
     const client = connectMqttClient(PUBLIC_BROKER_URL);
     mqttRef.current = client;
     const statusTopic = `campus/${map.id}/device/+/status`;
@@ -126,7 +128,7 @@ export function MapDisplay({ map, initialDevices }: MapDisplayProps) {
       client.unsubscribe(statusTopic);
       disconnectMqttClient();
     };
-  }, [map.id]);
+  }, [map.id, showIot]);
 
   const filteredBuildings = useMemo(
     () => map.buildings.filter((b) => visible.has(b.category)),
@@ -219,82 +221,85 @@ export function MapDisplay({ map, initialDevices }: MapDisplayProps) {
           highlightedId={highlightedId}
           onBuildingClick={handleBuildingClick}
         />
-        <svg
-          width="100%"
-          height="100%"
-          viewBox={`0 0 ${map.viewBoxWidth} ${map.viewBoxHeight}`}
-          preserveAspectRatio="xMidYMid meet"
-          className="pointer-events-none absolute inset-0"
-        >
-          <g transform={transform}>
-            {filteredDevices.map((device) => {
-              const Icon = device.type === "light" ? Lightbulb : Droplets;
-              const activeColor = device.type === "light" ? "#f59e0b" : "#06b6d4";
-              return (
-                <g
-                  key={device.id}
-                  transform={`translate(${device.positionX} ${device.positionY})`}
-                  className="pointer-events-auto"
-                  onPointerEnter={(e) => {
-                    setHoveredDevice({
-                      device,
-                      clientX: e.clientX,
-                      clientY: e.clientY,
-                    });
-                  }}
-                  onPointerMove={(e) => {
-                    setHoveredDevice((current) =>
-                      current && current.device.id === device.id
-                        ? {
-                            ...current,
-                            clientX: e.clientX,
-                            clientY: e.clientY,
-                          }
-                        : current,
-                    );
-                  }}
-                  onPointerLeave={() => {
-                    setHoveredDevice((current) =>
-                      current && current.device.id === device.id ? null : current,
-                    );
-                  }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    setSelectedDeviceId(device.id);
-                  }}
-                >
-                  <circle
-                    r={9 / view.scale}
-                    fill={device.state ? activeColor : "#6b7280"}
-                    stroke={selectedDeviceId === device.id ? "#111827" : "white"}
-                    strokeWidth={(selectedDeviceId === device.id ? 2.5 : 1.5) / view.scale}
-                  />
-                  <foreignObject
-                    x={-6 / view.scale}
-                    y={-6 / view.scale}
-                    width={12 / view.scale}
-                    height={12 / view.scale}
-                    pointerEvents="none"
+        {showIot ? (
+          <svg
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${map.viewBoxWidth} ${map.viewBoxHeight}`}
+            preserveAspectRatio="xMidYMid meet"
+            className="pointer-events-none absolute inset-0"
+          >
+            <g transform={transform}>
+              {filteredDevices.map((device) => {
+                const Icon = device.type === "light" ? Lightbulb : Droplets;
+                const activeColor = device.type === "light" ? "#f59e0b" : "#06b6d4";
+                return (
+                  <g
+                    key={device.id}
+                    transform={`translate(${device.positionX} ${device.positionY})`}
+                    className="pointer-events-auto"
+                    onPointerEnter={(e) => {
+                      setHoveredDevice({
+                        device,
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                      });
+                    }}
+                    onPointerMove={(e) => {
+                      setHoveredDevice((current) =>
+                        current && current.device.id === device.id
+                          ? {
+                              ...current,
+                              clientX: e.clientX,
+                              clientY: e.clientY,
+                            }
+                          : current,
+                      );
+                    }}
+                    onPointerLeave={() => {
+                      setHoveredDevice((current) =>
+                        current && current.device.id === device.id ? null : current,
+                      );
+                    }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setSelectedDeviceId(device.id);
+                    }}
                   >
-                    <div className="flex h-full w-full items-center justify-center text-white">
-                      <Icon size={9 / view.scale} />
-                    </div>
-                  </foreignObject>
-                </g>
-              );
-            })}
-          </g>
-        </svg>
+                    <circle
+                      r={9 / view.scale}
+                      fill={device.state ? activeColor : "#6b7280"}
+                      stroke={selectedDeviceId === device.id ? "#111827" : "white"}
+                      strokeWidth={(selectedDeviceId === device.id ? 2.5 : 1.5) / view.scale}
+                    />
+                    <foreignObject
+                      x={-6 / view.scale}
+                      y={-6 / view.scale}
+                      width={12 / view.scale}
+                      height={12 / view.scale}
+                      pointerEvents="none"
+                    >
+                      <div className="flex h-full w-full items-center justify-center text-white">
+                        <Icon size={9 / view.scale} />
+                      </div>
+                    </foreignObject>
+                  </g>
+                );
+              })}
+            </g>
+          </svg>
+        ) : null}
         <MapControls
           onZoomIn={() => zoomBy(1.2)}
           onZoomOut={() => zoomBy(1 / 1.2)}
           onReset={resetView}
         />
-        <div
-          className="absolute left-3 top-3 z-10 rounded-md border bg-background/95 px-3 py-2 text-xs shadow"
-          onPointerDown={(e) => e.stopPropagation()}
-          onPointerUp={(e) => e.stopPropagation()}
-        >
+        {showIot ? (
+          <div
+            className="absolute left-3 top-3 z-10 rounded-md border bg-background/95 px-3 py-2 text-xs shadow"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+          >
           <div className="mb-1 flex items-center gap-2">
             <span className="font-medium">IoT Devices</span>
             <Badge variant="secondary">{filteredDevices.length}</Badge>
@@ -359,8 +364,9 @@ export function MapDisplay({ map, initialDevices }: MapDisplayProps) {
           ) : (
             <div className="text-muted-foreground">Tap a device marker for details.</div>
           )}
-        </div>
-        {hoveredDevice ? (
+          </div>
+        ) : null}
+        {showIot && hoveredDevice ? (
           <div
             className="pointer-events-none fixed z-50 rounded-md bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
             style={{

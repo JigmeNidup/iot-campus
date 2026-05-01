@@ -51,6 +51,7 @@ export function MapCard({ map }: MapCardProps) {
   const [pending, startTransition] = useTransition();
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedIot, setCopiedIot] = useState(false);
 
   async function handleCopyLink() {
     const url =
@@ -76,6 +77,33 @@ export function MapCard({ map }: MapCardProps) {
     } catch (err) {
       console.error(err);
       toast.error("Could not copy link");
+    }
+  }
+
+  async function handleCopyIotLink() {
+    const url =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/map/${map.id}/iot`
+        : `/map/${map.id}/iot`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+      setCopiedIot(true);
+      toast.success("IoT link copied to clipboard");
+      window.setTimeout(() => setCopiedIot(false), 1500);
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not copy IoT link");
     }
   }
 
@@ -154,7 +182,24 @@ export function MapCard({ map }: MapCardProps) {
               className={!map.isPublished ? "pointer-events-none opacity-50" : ""}
             >
               <Eye className="size-4" />
-              Preview
+              Buildings
+            </Link>
+          </Button>
+
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            disabled={!map.isPublished}
+          >
+            <Link
+              href={`/map/${map.id}/iot`}
+              target="_blank"
+              aria-disabled={!map.isPublished}
+              className={!map.isPublished ? "pointer-events-none opacity-50" : ""}
+            >
+              <Eye className="size-4" />
+              IoT
             </Link>
           </Button>
 
@@ -176,6 +221,28 @@ export function MapCard({ map }: MapCardProps) {
               </TooltipTrigger>
               <TooltipContent>
                 {copied ? "Copied!" : "Copy public link"}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+
+          {map.isPublished ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyIotLink}
+                  aria-label="Copy public IoT link"
+                >
+                  {copiedIot ? (
+                    <Check className="size-4 text-emerald-600" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {copiedIot ? "Copied!" : "Copy public IoT link"}
               </TooltipContent>
             </Tooltip>
           ) : null}

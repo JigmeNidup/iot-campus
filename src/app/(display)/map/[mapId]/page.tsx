@@ -5,10 +5,8 @@ import { query } from "@/lib/db";
 import {
   mapRowToBuilding,
   mapRowToCampusMap,
-  mapRowToIotDevice,
   type BuildingRow,
   type CampusMapRow,
-  type IotDeviceRow,
 } from "@/lib/utils";
 import { MapDisplay } from "@/components/map/MapDisplay";
 
@@ -58,10 +56,5 @@ export default async function PublicMapPage({ params }: PageProps) {
     buildingsResult.rows.map(mapRowToBuilding),
   );
 
-  const devicesResult = await query<IotDeviceRow>(
-    "SELECT * FROM iot_devices WHERE map_id = $1 ORDER BY created_at ASC",
-    [mapId],
-  );
-
-  return <MapDisplay map={map} initialDevices={devicesResult.rows.map(mapRowToIotDevice)} />;
+  return <MapDisplay map={map} showIot={false} />;
 }
