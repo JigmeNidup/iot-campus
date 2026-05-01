@@ -35,8 +35,10 @@ interface MapDisplayProps {
 }
 
 const PUBLIC_BROKER_URL = "wss://broker.hivemq.com:8884/mqtt";
+const EMPTY_DEVICES: IotDevice[] = [];
 
-export function MapDisplay({ map, initialDevices = [], showIot = true }: MapDisplayProps) {
+export function MapDisplay({ map, initialDevices, showIot = true }: MapDisplayProps) {
+  const stableInitialDevices = initialDevices ?? EMPTY_DEVICES;
   const {
     transform,
     containerRef,
@@ -54,7 +56,7 @@ export function MapDisplay({ map, initialDevices = [], showIot = true }: MapDisp
   );
   const [selected, setSelected] = useState<Building | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const [devices, setDevices] = useState<IotDevice[]>(initialDevices);
+  const [devices, setDevices] = useState<IotDevice[]>(stableInitialDevices);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [showLight, setShowLight] = useState(true);
   const [showWaterValve, setShowWaterValve] = useState(true);
@@ -68,9 +70,9 @@ export function MapDisplay({ map, initialDevices = [], showIot = true }: MapDisp
   const mqttRef = useRef<MqttClient | null>(null);
 
   useEffect(() => {
-    setDevices(initialDevices);
+    setDevices(stableInitialDevices);
     setSelectedDeviceId(null);
-  }, [initialDevices, map.id]);
+  }, [stableInitialDevices, map.id]);
 
   useEffect(() => {
     if (!showIot) return;

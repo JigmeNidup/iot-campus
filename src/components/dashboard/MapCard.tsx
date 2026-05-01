@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -52,6 +53,12 @@ export function MapCard({ map }: MapCardProps) {
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedIot, setCopiedIot] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const deletePhrase = "delete this map";
+  const deleteEnabled = useMemo(
+    () => deleteConfirmText.trim().toLowerCase() === deletePhrase,
+    [deleteConfirmText],
+  );
 
   async function handleCopyLink() {
     const url =
@@ -160,21 +167,16 @@ export function MapCard({ map }: MapCardProps) {
           {map.description ?? "No description"}
         </p>
       </CardContent>
-      <CardFooter className="flex flex-wrap items-center justify-between gap-2 px-4 pb-4">
-        <Button asChild size="sm" variant="default">
-          <Link href={`/editor/${map.id}`}>
-            <Pencil className="size-4" />
-            Edit
-          </Link>
-        </Button>
+      <CardFooter className="flex flex-col gap-3 px-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="sm" variant="default">
+            <Link href={`/editor/${map.id}`}>
+              <Pencil className="size-4" />
+              Edit
+            </Link>
+          </Button>
 
-        <div className="flex items-center gap-2">
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            disabled={!map.isPublished}
-          >
+          <Button asChild size="sm" variant="outline" disabled={!map.isPublished}>
             <Link
               href={`/map/${map.id}`}
               target="_blank"
@@ -186,12 +188,7 @@ export function MapCard({ map }: MapCardProps) {
             </Link>
           </Button>
 
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            disabled={!map.isPublished}
-          >
+          <Button asChild size="sm" variant="outline" disabled={!map.isPublished}>
             <Link
               href={`/map/${map.id}/iot`}
               target="_blank"
@@ -202,71 +199,59 @@ export function MapCard({ map }: MapCardProps) {
               IoT
             </Link>
           </Button>
+        </div>
 
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {map.isPublished ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleCopyLink}
-                  aria-label="Copy public link"
-                >
-                  {copied ? (
-                    <Check className="size-4 text-emerald-600" />
-                  ) : (
-                    <Copy className="size-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {copied ? "Copied!" : "Copy public link"}
-              </TooltipContent>
-            </Tooltip>
+            <Button size="sm" variant="outline" onClick={handleCopyLink}>
+              {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+              Buildings link
+            </Button>
           ) : null}
 
           {map.isPublished ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleCopyIotLink}
-                  aria-label="Copy public IoT link"
-                >
-                  {copiedIot ? (
-                    <Check className="size-4 text-emerald-600" />
-                  ) : (
-                    <Copy className="size-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {copiedIot ? "Copied!" : "Copy public IoT link"}
-              </TooltipContent>
-            </Tooltip>
+            <Button size="sm" variant="outline" onClick={handleCopyIotLink}>
+              {copiedIot ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+              IoT link
+            </Button>
           ) : null}
 
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="ghost" aria-label="Delete map">
-                <Trash2 className="size-4 text-destructive" />
+              <Button size="sm" variant="destructive" aria-label="Delete map">
+                <Trash2 className="size-4" />
+                Delete
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete this map?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will permanently remove &quot;{map.name}&quot; and all of
-                  its buildings. This cannot be undone.
+                  This will permanently remove &quot;{map.name}&quot; and all of its buildings and devices. This cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
+
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground">
+                  Type <span className="font-mono text-foreground">delete this map</span> to confirm.
+                </div>
+                <Input
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="delete this map"
+                  autoComplete="off"
+                />
+              </div>
+
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={deleting || pending}>
+                <AlertDialogCancel
+                  disabled={deleting || pending}
+                  onClick={() => setDeleteConfirmText("")}
+                >
                   Cancel
                 </AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={deleting || pending}
+                  disabled={deleting || pending || !deleteEnabled}
                   onClick={handleDelete}
                   className="bg-destructive text-white hover:bg-destructive/90"
                 >
