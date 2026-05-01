@@ -171,7 +171,8 @@ void publishStatus() {
 bool sendBootStatusLog() {
   if (WiFi.status() != WL_CONNECTED) return false;
   HTTPClient http;
-  http.begin(String(BASE_SERVER_URL) + "/api/iot/status");
+  WiFiClient client;
+  http.begin(client, String(BASE_SERVER_URL) + "/api/iot/status");
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId +
     "\",\"deviceId\":\"" + deviceId +
@@ -302,7 +303,8 @@ void loop() {
 
 void registerComplete() {
   HTTPClient http;
-  http.begin(String(BASE_SERVER_URL) + "/api/iot/register/complete");
+  WiFiClient client;
+  http.begin(client, String(BASE_SERVER_URL) + "/api/iot/register/complete");
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId + "\",\"deviceId\":\"" + deviceId + "\",\"registrationToken\":\"" + String(BASE_REGISTRATION_TOKEN) +
     "\",\"boardTarget\":\"esp01\",\"wifiSsid\":\"" + wifiSsid + "\",\"mqttTopicPrefix\":\"" + topicPrefix +

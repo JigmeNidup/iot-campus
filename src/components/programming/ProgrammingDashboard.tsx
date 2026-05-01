@@ -30,7 +30,20 @@ interface ProgrammingDashboardProps {
 }
 
 type BoardTarget = "esp32" | "esp01";
-type ProgrammingTab = "code" | "base" | "firmware" | "ota" | "webserial";
+type ProgrammingTab = "code" | "base" | "firmware" | "ota" | "deviceLogs" | "webserial";
+
+type DeviceLogSource = "device" | "ota";
+type DeviceLogRow = {
+  source: DeviceLogSource;
+  id: string;
+  map_id: string;
+  device_id: string;
+  kind: string;
+  state: boolean | null;
+  firmware_version: string | null;
+  detail: string | null;
+  created_at: string;
+};
 type BaseCodeType = "light" | "water_valve" | "temp_humidity";
 type DeviceTypeFilter = "all" | "light" | "water_valve" | "temp_humidity";
 type BaudRate = 9600 | 115200 | 230400 | 460800;
@@ -44,6 +57,46 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
   const [wifiPassword, setWifiPassword] = useState("");
   const [board, setBoard] = useState<BoardTarget>("esp32");
   const [tab, setTab] = useState<ProgrammingTab>("code");
+
+  const [deviceLogs, setDeviceLogs] = useState<DeviceLogRow[]>([]);
+  const [deviceLogsTotal, setDeviceLogsTotal] = useState(0);
+  const [deviceLogsLoading, setDeviceLogsLoading] = useState(false);
+  const [deviceLogsSource, setDeviceLogsSource] = useState<DeviceLogSource | "all">("all");
+  const [deviceLogsDeviceId, setDeviceLogsDeviceId] = useState<string>("all");
+  const [deviceLogsKind, setDeviceLogsKind] = useState<string>("");
+  const [deviceLogsQuery, setDeviceLogsQuery] = useState<string>("");
+  const [deviceLogsFrom, setDeviceLogsFrom] = useState<string>("");
+  const [deviceLogsTo, setDeviceLogsTo] = useState<string>("");
+  const [deviceLogsLimit, setDeviceLogsLimit] = useState<number>(100);
+  const [deviceLogsOffset, setDeviceLogsOffset] = useState<number>(0);
+
+  async function loadDeviceLogs(nextOffset?: number) {
+    if (!selectedMapId) return;
+    setDeviceLogsLoading(true);
+    try {
+      const sp = new URLSearchParams();
+      sp.set("mapId", selectedMapId);
+      sp.set("limit", String(deviceLogsLimit));
+      sp.set("offset", String(nextOffset ?? deviceLogsOffset));
+      if (deviceLogsSource !== "all") sp.set("source", deviceLogsSource);
+      if (deviceLogsDeviceId !== "all") sp.set("deviceId", deviceLogsDeviceId);
+      if (deviceLogsKind.trim()) sp.set("kind", deviceLogsKind.trim());
+      if (deviceLogsQuery.trim()) sp.set("q", deviceLogsQuery.trim());
+      if (deviceLogsFrom) sp.set("from", new Date(deviceLogsFrom).toISOString());
+      if (deviceLogsTo) sp.set("to", new Date(deviceLogsTo).toISOString());
+
+      const res = await fetch(`/api/iot/logs?${sp.toString()}`, { method: "GET" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load device logs");
+      setDeviceLogs((data.logs ?? []) as DeviceLogRow[]);
+      setDeviceLogsTotal(Number(data.total ?? 0));
+      setDeviceLogsOffset(Number(data.offset ?? 0));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load device logs");
+    } finally {
+      setDeviceLogsLoading(false);
+    }
+  }
   const [baseCodeType, setBaseCodeType] = useState<BaseCodeType>("light");
   const [baseCodeContent, setBaseCodeContent] = useState("");
   const [baseCodePath, setBaseCodePath] = useState("");
@@ -236,6 +289,13 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
       })();
     }, 5000);
     return () => clearInterval(timer);
+  }, [tab, selectedMapId]);
+
+  useEffect(() => {
+    if (tab !== "deviceLogs") return;
+    setDeviceLogsOffset(0);
+    void loadDeviceLogs(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, selectedMapId]);
 
   useEffect(() => {
@@ -761,6 +821,7 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
             <TabsTrigger value="base">Base-code</TabsTrigger>
             <TabsTrigger value="firmware">Firmware Manager</TabsTrigger>
             <TabsTrigger value="ota">Over-the-Air Update</TabsTrigger>
+            <TabsTrigger value="deviceLogs">Device logs</TabsTrigger>
             <TabsTrigger value="webserial">WebSerial</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -768,15 +829,177 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-muted/20 p-4">
-          {!selectedDevice ? (
+          {!selectedDevice && tab !== "deviceLogs" ? (
             <div className="rounded-lg border border-dashed bg-background p-6 text-sm text-muted-foreground">
               Select a device to generate `.ino` firmware.
+            </div>
+          ) : tab === "deviceLogs" ? (
+            <div className="rounded-lg border bg-background">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+                <div className="text-sm font-medium">Device logs</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={deviceLogsSource}
+                    onValueChange={(v) => setDeviceLogsSource(v as DeviceLogSource | "all")}
+                  >
+                    <SelectTrigger className="h-8 w-[160px]">
+                      <SelectValue placeholder="Source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All sources</SelectItem>
+                      <SelectItem value="device">Device</SelectItem>
+                      <SelectItem value="ota">OTA</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={deviceLogsDeviceId} onValueChange={setDeviceLogsDeviceId}>
+                    <SelectTrigger className="h-8 w-[260px]">
+                      <SelectValue placeholder="Device" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All devices</SelectItem>
+                      {devices.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name} ({d.type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Input
+                    className="h-8 w-[160px]"
+                    placeholder="Kind (e.g. boot_online)"
+                    value={deviceLogsKind}
+                    onChange={(e) => setDeviceLogsKind(e.target.value)}
+                  />
+                  <Input
+                    className="h-8 w-[220px]"
+                    placeholder="Search detail"
+                    value={deviceLogsQuery}
+                    onChange={(e) => setDeviceLogsQuery(e.target.value)}
+                  />
+                  <Input
+                    className="h-8 w-[210px]"
+                    type="datetime-local"
+                    value={deviceLogsFrom}
+                    onChange={(e) => setDeviceLogsFrom(e.target.value)}
+                  />
+                  <Input
+                    className="h-8 w-[210px]"
+                    type="datetime-local"
+                    value={deviceLogsTo}
+                    onChange={(e) => setDeviceLogsTo(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={deviceLogsLoading}
+                    onClick={() => void loadDeviceLogs(0)}
+                  >
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+
+              <div className="p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                  <div>
+                    Showing {Math.min(deviceLogsTotal, deviceLogsOffset + 1)}-
+                    {Math.min(deviceLogsTotal, deviceLogsOffset + deviceLogs.length)} of {deviceLogsTotal}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={String(deviceLogsLimit)}
+                      onValueChange={(v) => setDeviceLogsLimit(Number(v))}
+                    >
+                      <SelectTrigger className="h-8 w-[110px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                        <SelectItem value="200">200</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={deviceLogsLoading || deviceLogsOffset <= 0}
+                      onClick={() => void loadDeviceLogs(Math.max(0, deviceLogsOffset - deviceLogsLimit))}
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={deviceLogsLoading || deviceLogsOffset + deviceLogsLimit >= deviceLogsTotal}
+                      onClick={() => void loadDeviceLogs(deviceLogsOffset + deviceLogsLimit)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="overflow-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
+                        <th>Time</th>
+                        <th>Source</th>
+                        <th>Device</th>
+                        <th>Kind</th>
+                        <th>FW</th>
+                        <th>State</th>
+                        <th>Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody className="[&>tr>td]:px-3 [&>tr>td]:py-2">
+                      {deviceLogsLoading ? (
+                        <tr>
+                          <td colSpan={7} className="text-muted-foreground">
+                            Loading...
+                          </td>
+                        </tr>
+                      ) : deviceLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-muted-foreground">
+                            No logs found.
+                          </td>
+                        </tr>
+                      ) : (
+                        deviceLogs.map((l) => {
+                          const d = devices.find((x) => x.id === l.device_id);
+                          return (
+                            <tr key={`${l.source}-${l.id}`} className="border-t">
+                              <td className="whitespace-nowrap">
+                                {new Date(l.created_at).toLocaleString()}
+                              </td>
+                              <td className="whitespace-nowrap">{l.source}</td>
+                              <td className="whitespace-nowrap">
+                                {d ? `${d.name} (${d.type})` : l.device_id}
+                              </td>
+                              <td className="whitespace-nowrap">{l.kind}</td>
+                              <td className="whitespace-nowrap">{l.firmware_version ?? "--"}</td>
+                              <td className="whitespace-nowrap">
+                                {l.state === null ? "--" : l.state ? "ON" : "OFF"}
+                              </td>
+                              <td className="max-w-[520px] break-words text-muted-foreground">
+                                {l.detail ?? "--"}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           ) : tab === "code" ? (
             <div className="rounded-lg border bg-background">
               <div className="flex items-center justify-between border-b px-4 py-2">
                 <div className="text-sm font-medium">
-                  {selectedDevice.name} - {board.toUpperCase()} firmware
+                  {selectedDevice!.name} - {board.toUpperCase()} firmware
                 </div>
                 <Button
                   size="sm"
