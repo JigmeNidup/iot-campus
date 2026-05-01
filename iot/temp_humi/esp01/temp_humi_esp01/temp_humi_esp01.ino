@@ -15,6 +15,7 @@ static const char* BASE_SERVER_URL = "http://localhost:3004";
 static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
 static const int DHT_PIN = 2;
 static const int DHT_TYPE = DHT11;
+static const int RESET_BUTTON_PIN = 0; // active-low, hold >3s to clear WiFi + topicPrefix (avoid holding during boot)
 
 ESP8266WebServer portal(80);
 WiFiClient wifiClient;
@@ -30,6 +31,34 @@ String firmwareVersion;
 bool configured = false;
 bool bootStatusSent = false;
 unsigned long lastPublishMs = 0;
+bool resetHeld = false;
+unsigned long resetPressedAtMs = 0;
+bool resetTriggered = false;
+
+void clearConfig() {
+  wifiSsid = "";
+  wifiPassword = "";
+  topicPrefix = "";
+  saveCfg(wifiSsid, wifiPassword, topicPrefix); // keeps firmwareVersion
+}
+
+void handleResetButton() {
+  if (resetTriggered) return;
+  const bool pressed = digitalRead(RESET_BUTTON_PIN) == LOW;
+  if (pressed) {
+    if (!resetHeld) {
+      resetHeld = true;
+      resetPressedAtMs = millis();
+    } else if (millis() - resetPressedAtMs >= 3000) {
+      resetTriggered = true;
+      clearConfig();
+      delay(100);
+      ESP.restart();
+    }
+  } else {
+    resetHeld = false;
+  }
+}
 
 static String parseJsonStringField(const String& body, const char* field) {
   String key = String('"') + field + "\":\"";
@@ -201,6 +230,7 @@ void connectMqtt() {
 
 void setup() {
   dht.begin();
+  pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
   loadCfg();
   if (!configured) {
     startPortal();
@@ -213,6 +243,7 @@ void setup() {
 }
 
 void loop() {
+  handleResetButton();
   if (!configured) {
     portal.handleClient();
     return;

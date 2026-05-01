@@ -16,6 +16,7 @@ static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
 static const char* MQTT_CLIENT_ID_PREFIX = "esp01-light-";
 
 static const int LIGHT_PIN = 2;
+static const int RESET_BUTTON_PIN = 0; // active-low, hold >3s to clear WiFi + topicPrefix (avoid holding during boot)
 
 ESP8266WebServer portal(80);
 WiFiClient wifiClient;
@@ -31,6 +32,34 @@ bool configured = false;
 bool lightState = false;
 bool bootStatusSent = false;
 unsigned long lastStatusPublishMs = 0;
+bool resetHeld = false;
+unsigned long resetPressedAtMs = 0;
+bool resetTriggered = false;
+
+void clearConfig() {
+  wifiSsid = "";
+  wifiPassword = "";
+  topicPrefix = "";
+  saveCfg(wifiSsid, wifiPassword, topicPrefix); // keeps firmwareVersion
+}
+
+void handleResetButton() {
+  if (resetTriggered) return;
+  const bool pressed = digitalRead(RESET_BUTTON_PIN) == LOW;
+  if (pressed) {
+    if (!resetHeld) {
+      resetHeld = true;
+      resetPressedAtMs = millis();
+    } else if (millis() - resetPressedAtMs >= 3000) {
+      resetTriggered = true;
+      clearConfig();
+      delay(100);
+      ESP.restart();
+    }
+  } else {
+    resetHeld = false;
+  }
+}
 
 static String parseJsonStringField(const String& body, const char* field) {
   String key = String('"') + field + "\":\"";
@@ -219,6 +248,7 @@ void connectMqtt() {
 }
 
 void setup() {
+  pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
   pinMode(LIGHT_PIN, OUTPUT);
   setLight(false);
   loadCfg();
@@ -239,6 +269,7 @@ void setup() {
 }
 
 void loop() {
+  handleResetButton();
   if (!configured) {
     portal.handleClient();
     return;

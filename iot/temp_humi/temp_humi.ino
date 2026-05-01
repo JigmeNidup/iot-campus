@@ -15,6 +15,7 @@ static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
 static const char* BASE_SERVER_URL = "http://localhost:3004";
 static const int DHT_PIN = 25;
 static const int DHT_TYPE = DHT11;
+static const int RESET_BUTTON_PIN = 0; // active-low, hold >3s to clear WiFi + topicPrefix
 
 Preferences prefs;
 WebServer portal(80);
@@ -31,6 +32,35 @@ String firmwareVersion;
 bool configured = false;
 bool bootStatusSent = false;
 unsigned long lastPublishMs = 0;
+bool resetHeld = false;
+unsigned long resetPressedAtMs = 0;
+bool resetTriggered = false;
+
+void clearConfig() {
+  prefs.begin("cfg", false);
+  prefs.putString("ssid", "");
+  prefs.putString("pass", "");
+  prefs.putString("prefix", "");
+  prefs.end();
+}
+
+void handleResetButton() {
+  if (resetTriggered) return;
+  const bool pressed = digitalRead(RESET_BUTTON_PIN) == LOW;
+  if (pressed) {
+    if (!resetHeld) {
+      resetHeld = true;
+      resetPressedAtMs = millis();
+    } else if (millis() - resetPressedAtMs >= 3000) {
+      resetTriggered = true;
+      clearConfig();
+      delay(100);
+      ESP.restart();
+    }
+  } else {
+    resetHeld = false;
+  }
+}
 
 void loadFirmwareVersion() {
   prefs.begin("fw", true);
@@ -219,6 +249,7 @@ void connectMqtt() {
 
 void setup() {
   dht.begin();
+  pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
   loadFirmwareVersion();
   loadConfig();
   if (!configured) {
@@ -236,6 +267,7 @@ void setup() {
 }
 
 void loop() {
+  handleResetButton();
   if (!configured) {
     portal.handleClient();
     return;
