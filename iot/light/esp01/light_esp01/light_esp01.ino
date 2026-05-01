@@ -8,8 +8,6 @@
 #define MQTT_MAX_PACKET_SIZE 1200
 #include <PubSubClient.h>
 
-#define DEBUG_SERIAL 0
-
 static const char* DEVICE_TYPE = "light";
 static const char FW_VERSION_DEFAULT[] = "v1.0.0";
 static const char* MQTT_BROKER = "broker.hivemq.com";
@@ -19,6 +17,7 @@ static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
 static const char* MQTT_CLIENT_ID_PREFIX = "esp01-light-";
 
 static const int LIGHT_PIN = 0;
+static const bool LIGHT_ACTIVE_LOW = true;
 
 ESP8266WebServer portal(80);
 WiFiClient wifiClient;
@@ -82,7 +81,8 @@ static String parseJsonStringField(const String& body, const char* field) {
 
 void setLight(bool on) {
   lightState = on;
-  digitalWrite(LIGHT_PIN, on ? HIGH : LOW);
+  if (LIGHT_ACTIVE_LOW) digitalWrite(LIGHT_PIN, on ? LOW : HIGH);
+  else digitalWrite(LIGHT_PIN, on ? HIGH : LOW);
 }
 
 String commandTopic() { return topicPrefix + "/command"; }
@@ -202,8 +202,15 @@ void publishStatus() {
 bool sendBootStatusLog() {
   if (WiFi.status() != WL_CONNECTED) return false;
   HTTPClient http;
-  WiFiClient client;
-  http.begin(client, String(BASE_SERVER_URL) + "/api/iot/status");
+  const String url = String(BASE_SERVER_URL) + "/api/iot/status";
+  if (url.startsWith("https://")) {
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    http.begin(client, url);
+  } else {
+    WiFiClient client;
+    http.begin(client, url);
+  }
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId +
     "\",\"deviceId\":\"" + deviceId +
@@ -345,12 +352,24 @@ void loop() {
 
 void registerComplete() {
   HTTPClient http;
-  WiFiClient client;
-  http.begin(client, String(BASE_SERVER_URL) + "/api/iot/register/complete");
+  const String url = String(BASE_SERVER_URL) + "/api/iot/register/complete";
+  if (url.startsWith("https://")) {
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    http.begin(client, url);
+  } else {
+    WiFiClient client;
+    http.begin(client, url);
+  }
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId + "\",\"deviceId\":\"" + deviceId + "\",\"registrationToken\":\"" + String(BASE_REGISTRATION_TOKEN) +
     "\",\"boardTarget\":\"esp01\",\"wifiSsid\":\"" + wifiSsid + "\",\"mqttTopicPrefix\":\"" + topicPrefix +
     "\",\"firmwareVersion\":\"" + firmwareVersion + "\"}";
-  http.POST(body);
+  // best-effort; retried once after a short delay
+  int code = http.POST(body);
+  if (code < 200 || code >= 300) {
+    delay(500);
+    code = http.POST(body);
+  }
   http.end();
 }

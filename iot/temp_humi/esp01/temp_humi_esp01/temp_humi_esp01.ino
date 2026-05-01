@@ -192,8 +192,15 @@ void publishSensorStatus(float temperature, float humidity) {
 bool sendBootStatusLog() {
   if (WiFi.status() != WL_CONNECTED) return false;
   HTTPClient http;
-  WiFiClient client;
-  http.begin(client, String(BASE_SERVER_URL) + "/api/iot/status");
+  const String url = String(BASE_SERVER_URL) + "/api/iot/status";
+  if (url.startsWith("https://")) {
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    http.begin(client, url);
+  } else {
+    WiFiClient client;
+    http.begin(client, url);
+  }
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId +
     "\",\"deviceId\":\"" + deviceId +
@@ -322,12 +329,23 @@ void loop() {
 
 void registerComplete() {
   HTTPClient http;
-  WiFiClient client;
-  http.begin(client, String(BASE_SERVER_URL) + "/api/iot/register/complete");
+  const String url = String(BASE_SERVER_URL) + "/api/iot/register/complete";
+  if (url.startsWith("https://")) {
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    http.begin(client, url);
+  } else {
+    WiFiClient client;
+    http.begin(client, url);
+  }
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId + "\",\"deviceId\":\"" + deviceId + "\",\"registrationToken\":\"" + String(BASE_REGISTRATION_TOKEN) +
     "\",\"boardTarget\":\"esp01\",\"wifiSsid\":\"" + wifiSsid + "\",\"mqttTopicPrefix\":\"" + topicPrefix +
     "\",\"firmwareVersion\":\"" + firmwareVersion + "\"}";
-  http.POST(body);
+  int code = http.POST(body);
+  if (code < 200 || code >= 300) {
+    delay(500);
+    code = http.POST(body);
+  }
   http.end();
 }
