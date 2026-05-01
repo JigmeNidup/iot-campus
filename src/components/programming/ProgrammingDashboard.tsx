@@ -57,6 +57,7 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
   const [wifiPassword, setWifiPassword] = useState("");
   const [board, setBoard] = useState<BoardTarget>("esp32");
   const [tab, setTab] = useState<ProgrammingTab>("code");
+  const [codeWrap, setCodeWrap] = useState(false);
 
   const [deviceLogs, setDeviceLogs] = useState<DeviceLogRow[]>([]);
   const [deviceLogsTotal, setDeviceLogsTotal] = useState(0);
@@ -69,6 +70,7 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
   const [deviceLogsTo, setDeviceLogsTo] = useState<string>("");
   const [deviceLogsLimit, setDeviceLogsLimit] = useState<number>(100);
   const [deviceLogsOffset, setDeviceLogsOffset] = useState<number>(0);
+  const [deviceLogsDirty, setDeviceLogsDirty] = useState(false);
 
   async function loadDeviceLogs(nextOffset?: number) {
     if (!selectedMapId) return;
@@ -542,6 +544,18 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
     }
   }
 
+  function downloadText(filename: string, content: string) {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function appendSerialLog(text: string) {
     setSerialLog((prev) => {
       const next = prev + text;
@@ -781,50 +795,59 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
-      <div className="flex flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
-        <Select value={selectedMapId} onValueChange={setSelectedMapId}>
-          <SelectTrigger className="w-[280px]">
-            <SelectValue placeholder="Select map" />
-          </SelectTrigger>
-          <SelectContent>
-            {maps.map((map) => (
-              <SelectItem key={map.id} value={map.id}>
-                {map.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          className="w-[220px]"
-          placeholder="WiFi SSID"
-          value={wifiSsid}
-          onChange={(e) => setWifiSsid(e.target.value)}
-        />
-        <Input
-          className="w-[220px]"
-          placeholder="WiFi Password"
-          value={wifiPassword}
-          onChange={(e) => setWifiPassword(e.target.value)}
-        />
-        <Select value={board} onValueChange={(v) => setBoard(v as BoardTarget)}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="esp32">ESP32</SelectItem>
-            <SelectItem value="esp01">ESP-01</SelectItem>
-          </SelectContent>
-        </Select>
-        <Tabs value={tab} onValueChange={(v) => setTab(v as ProgrammingTab)}>
-          <TabsList>
-            <TabsTrigger value="code">Code Generation</TabsTrigger>
-            <TabsTrigger value="base">Base-code</TabsTrigger>
-            <TabsTrigger value="firmware">Firmware Manager</TabsTrigger>
-            <TabsTrigger value="ota">Over-the-Air Update</TabsTrigger>
-            <TabsTrigger value="deviceLogs">Device logs</TabsTrigger>
-            <TabsTrigger value="webserial">WebSerial</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <div className="border-b bg-background px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={selectedMapId} onValueChange={setSelectedMapId}>
+            <SelectTrigger className="w-[280px]">
+              <SelectValue placeholder="Select map" />
+            </SelectTrigger>
+            <SelectContent>
+              {maps.map((map) => (
+                <SelectItem key={map.id} value={map.id}>
+                  {map.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            className="w-[220px]"
+            placeholder="WiFi SSID"
+            value={wifiSsid}
+            onChange={(e) => setWifiSsid(e.target.value)}
+          />
+          <Input
+            className="w-[220px]"
+            placeholder="WiFi Password"
+            value={wifiPassword}
+            onChange={(e) => setWifiPassword(e.target.value)}
+          />
+          <div className="flex items-center gap-2">
+            <Select value={board} onValueChange={(v) => setBoard(v as BoardTarget)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="esp32">ESP32</SelectItem>
+                <SelectItem value="esp01">ESP-01</SelectItem>
+              </SelectContent>
+            </Select>
+            <Badge variant="secondary" className="h-9">
+              Target: {board.toUpperCase()}
+            </Badge>
+          </div>
+          <div className="ml-auto">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as ProgrammingTab)}>
+              <TabsList>
+                <TabsTrigger value="code">Code</TabsTrigger>
+                <TabsTrigger value="base">Base</TabsTrigger>
+                <TabsTrigger value="firmware">Firmware</TabsTrigger>
+                <TabsTrigger value="ota">OTA</TabsTrigger>
+                <TabsTrigger value="deviceLogs">Logs</TabsTrigger>
+                <TabsTrigger value="webserial">WebSerial</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -840,7 +863,10 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                 <div className="flex flex-wrap items-center gap-2">
                   <Select
                     value={deviceLogsSource}
-                    onValueChange={(v) => setDeviceLogsSource(v as DeviceLogSource | "all")}
+                    onValueChange={(v) => {
+                      setDeviceLogsSource(v as DeviceLogSource | "all");
+                      setDeviceLogsDirty(true);
+                    }}
                   >
                     <SelectTrigger className="h-8 w-[160px]">
                       <SelectValue placeholder="Source" />
@@ -852,7 +878,13 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                     </SelectContent>
                   </Select>
 
-                  <Select value={deviceLogsDeviceId} onValueChange={setDeviceLogsDeviceId}>
+                  <Select
+                    value={deviceLogsDeviceId}
+                    onValueChange={(v) => {
+                      setDeviceLogsDeviceId(v);
+                      setDeviceLogsDirty(true);
+                    }}
+                  >
                     <SelectTrigger className="h-8 w-[260px]">
                       <SelectValue placeholder="Device" />
                     </SelectTrigger>
@@ -870,26 +902,51 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                     className="h-8 w-[160px]"
                     placeholder="Kind (e.g. boot_online)"
                     value={deviceLogsKind}
-                    onChange={(e) => setDeviceLogsKind(e.target.value)}
+                    onChange={(e) => {
+                      setDeviceLogsKind(e.target.value);
+                      setDeviceLogsDirty(true);
+                    }}
                   />
                   <Input
                     className="h-8 w-[220px]"
                     placeholder="Search detail"
                     value={deviceLogsQuery}
-                    onChange={(e) => setDeviceLogsQuery(e.target.value)}
+                    onChange={(e) => {
+                      setDeviceLogsQuery(e.target.value);
+                      setDeviceLogsDirty(true);
+                    }}
                   />
                   <Input
                     className="h-8 w-[210px]"
                     type="datetime-local"
                     value={deviceLogsFrom}
-                    onChange={(e) => setDeviceLogsFrom(e.target.value)}
+                    onChange={(e) => {
+                      setDeviceLogsFrom(e.target.value);
+                      setDeviceLogsDirty(true);
+                    }}
                   />
                   <Input
                     className="h-8 w-[210px]"
                     type="datetime-local"
                     value={deviceLogsTo}
-                    onChange={(e) => setDeviceLogsTo(e.target.value)}
+                    onChange={(e) => {
+                      setDeviceLogsTo(e.target.value);
+                      setDeviceLogsDirty(true);
+                    }}
                   />
+                  {deviceLogsDirty ? (
+                    <span className="mr-1 text-xs text-muted-foreground">Filters changed</span>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    disabled={deviceLogsLoading || !deviceLogsDirty}
+                    onClick={() => {
+                      setDeviceLogsDirty(false);
+                      void loadDeviceLogs(0);
+                    }}
+                  >
+                    Apply
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -898,19 +955,45 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                   >
                     Refresh
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setDeviceLogsSource("all");
+                      setDeviceLogsDeviceId("all");
+                      setDeviceLogsKind("");
+                      setDeviceLogsQuery("");
+                      setDeviceLogsFrom("");
+                      setDeviceLogsTo("");
+                      setDeviceLogsLimit(100);
+                      setDeviceLogsOffset(0);
+                      setDeviceLogsDirty(true);
+                    }}
+                  >
+                    Reset
+                  </Button>
                 </div>
               </div>
 
               <div className="p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                   <div>
-                    Showing {Math.min(deviceLogsTotal, deviceLogsOffset + 1)}-
-                    {Math.min(deviceLogsTotal, deviceLogsOffset + deviceLogs.length)} of {deviceLogsTotal}
+                    {deviceLogsTotal === 0 ? (
+                      <span>Showing 0 of 0</span>
+                    ) : (
+                      <span>
+                        Showing {deviceLogsOffset + 1}-
+                        {Math.min(deviceLogsTotal, deviceLogsOffset + deviceLogs.length)} of {deviceLogsTotal}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Select
                       value={String(deviceLogsLimit)}
-                      onValueChange={(v) => setDeviceLogsLimit(Number(v))}
+                      onValueChange={(v) => {
+                        setDeviceLogsLimit(Number(v));
+                        setDeviceLogsDirty(true);
+                      }}
                     >
                       <SelectTrigger className="h-8 w-[110px]">
                         <SelectValue />
@@ -942,7 +1025,7 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
 
                 <div className="overflow-auto rounded-md border">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
                       <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
                         <th>Time</th>
                         <th>Source</th>
@@ -983,8 +1066,18 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                               <td className="whitespace-nowrap">
                                 {l.state === null ? "--" : l.state ? "ON" : "OFF"}
                               </td>
-                              <td className="max-w-[520px] break-words text-muted-foreground">
-                                {l.detail ?? "--"}
+                              <td className="max-w-[520px] text-muted-foreground">
+                                {l.detail ? (
+                                  <button
+                                    className="block w-full truncate text-left hover:underline"
+                                    title={l.detail}
+                                    onClick={() => window.alert(l.detail)}
+                                  >
+                                    {l.detail}
+                                  </button>
+                                ) : (
+                                  "--"
+                                )}
                               </td>
                             </tr>
                           );
@@ -1001,16 +1094,34 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                 <div className="text-sm font-medium">
                   {selectedDevice!.name} - {board.toUpperCase()} firmware
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void copyCode(generatedCode)}
-                >
-                  <Copy className="size-4" />
-                  Copy code
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setCodeWrap((v) => !v)}>
+                    {codeWrap ? "No wrap" : "Wrap"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => void copyCode(generatedCode)}>
+                    <Copy className="size-4" />
+                    Copy
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      downloadText(
+                        `${selectedDevice!.name.replaceAll(" ", "-")}-${board}.ino`,
+                        generatedCode,
+                      )
+                    }
+                  >
+                    Download .ino
+                  </Button>
+                </div>
               </div>
-              <pre className="overflow-auto p-4 text-xs leading-5">
+              <pre
+                className={cn(
+                  "p-4 text-xs leading-5",
+                  codeWrap ? "whitespace-pre-wrap break-words" : "overflow-auto whitespace-pre",
+                )}
+              >
                 <code>{generatedCode}</code>
               </pre>
             </div>
@@ -1033,22 +1144,40 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void copyCode(baseCodeContent)}
-                  disabled={!baseCodeContent}
-                >
-                  <Copy className="size-4" />
-                  Copy base code
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setCodeWrap((v) => !v)}>
+                    {codeWrap ? "No wrap" : "Wrap"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void copyCode(baseCodeContent)}
+                    disabled={!baseCodeContent}
+                  >
+                    <Copy className="size-4" />
+                    Copy
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!baseCodeContent}
+                    onClick={() => downloadText(`base-${baseCodeType}-${board}.ino`, baseCodeContent)}
+                  >
+                    Download .ino
+                  </Button>
+                </div>
               </div>
               {baseCodePath ? (
                 <div className="border-b px-4 py-1 text-xs text-muted-foreground">
                   Source: {baseCodePath}
                 </div>
               ) : null}
-              <pre className="overflow-auto p-4 text-xs leading-5">
+              <pre
+                className={cn(
+                  "p-4 text-xs leading-5",
+                  codeWrap ? "whitespace-pre-wrap break-words" : "overflow-auto whitespace-pre",
+                )}
+              >
                 <code>
                   {baseCodeLoading
                     ? "// Loading base firmware..."
