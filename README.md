@@ -21,6 +21,8 @@ Built with **Next.js 16 (App Router)**, **TypeScript** (strict mode), **Tailwind
 - Copy-link button on the dashboard for any published map
 - IoT device management dashboard (`/dashboard/iot`) with map overlays, drag-to-move, lock/unlock, and inline editing
 - Programming dashboard (`/dashboard/programming`) for per-device ESP firmware generation and OTA lifecycle controls
+  - **Test** tab: minimal MQTT control sketch (no provisioning portal, OTA, or reset logic)
+  - **Base** tab: the full base firmware templates used for initial flashing/provisioning
 - Public map IoT display for unauthenticated users with live MQTT status updates and marker hover details
 - Global per-map `temp_humidity` sensor (one per map) with editor and public display cards
 - Import / export IoT devices as JSON (replace or append mode)
@@ -184,6 +186,13 @@ public/
 - **Base server URL**: firmware templates use `BASE_SERVER_URL` (default `http://localhost:3004`) to call:
   - `POST /api/iot/register/complete`
   - `POST /api/iot/status`
+- **Base-code sources** (used by the Programming dashboard Base tab):
+  - ESP32 light: `iot/light/light.ino`
+  - ESP-01 light: `iot/light/esp01/light_esp01/light_esp01.ino`
+  - ESP32 water valve: `iot/water_valve/water_valve.ino`
+  - ESP-01 water valve: `iot/water_valve/esp01/water_valve_esp01/water_valve_esp01.ino`
+  - ESP32 temp/humidity: `iot/temp_humi/temp_humi.ino`
+  - ESP-01 temp/humidity: `iot/temp_humi/esp01/temp_humi_esp01/temp_humi_esp01.ino`
 - **Provisioning trigger**: on-device provisioning AP can be forced by **3 resets within ~3 seconds**.
   - This **does not erase** stored WiFi/topic settings; the stored config is only overwritten when you submit new values in the AP portal.
   - The reset counter is cleared when AP mode is entered, so **resetting while in AP mode returns to normal boot** (unless you triple-reset again).
