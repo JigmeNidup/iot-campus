@@ -14,6 +14,8 @@ NextAuth v5's middleware runs in the **Edge runtime**, which forbids Node-only m
 | `src/lib/auth.ts` | Node | spreads `authConfig` and adds the `Credentials` provider with `pg` + `bcryptjs` |
 | `src/middleware.ts` | Edge | imports **only** `authConfig` and calls `NextAuth(authConfig).auth` |
 
+**Next.js 16:** `npm run build` may warn that the **`middleware` file convention is deprecated** in favor of **`proxy`**. Routing still works; migrate using the official [middleware → proxy](https://nextjs.org/docs/messages/middleware-to-proxy) guide when ready.
+
 ## Rules
 
 - Anything that touches `pg`, `bcryptjs`, or other Node APIs must live in `auth.ts`, never `auth.config.ts`.

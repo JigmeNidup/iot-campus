@@ -16,6 +16,10 @@ Files in `public/uploads/` are not copied during `next build`, so anything uploa
 2. `src/app/api/upload/route.ts` (Node runtime, auth-guarded) writes to `UPLOAD_DIR` from `src/lib/uploads.ts`, returns `{ url: fileUrl(filename) }` where `fileUrl` is `/api/files/<filename>`.
 3. `src/app/api/files/[id]/route.ts` validates the filename against `isSafeFilename`, defends against path traversal, content-types via the extension map, and returns the bytes with a long immutable cache header.
 
+## Turbopack / build tracing
+
+`UPLOAD_DIR` in `src/lib/uploads.ts` uses `path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads")` to reduce bogus **NFT / “whole project traced”** warnings during `next build`. Residual warnings from `fs`/`path` in `api/upload` are often safe to ignore for Node deployments that write under `./uploads/`.
+
 ## Constraints
 
 - MIME allowlist + 25 MB cap from `src/lib/validators.ts` (`ALLOWED_UPLOAD_MIME_TYPES`, `MAX_UPLOAD_BYTES`, `MAX_UPLOAD_MB`). `next.config.ts` `serverActions.bodySizeLimit` is `26mb` to stay above this.
