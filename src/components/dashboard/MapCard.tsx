@@ -19,18 +19,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -134,14 +122,14 @@ export function MapCard({ map }: MapCardProps) {
   }
 
   return (
-    <Card className="flex flex-col overflow-hidden p-0">
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted">
+    <div className="flex w-full flex-col overflow-hidden rounded-xl bg-card shadow-sm transition-shadow duration-200 ease-out hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/40 md:min-h-[220px] md:flex-row">
+      <div className="relative h-52 w-full shrink-0 bg-muted md:h-auto md:w-3/5 md:min-h-[220px]">
         {map.imageUrl ? (
           <Image
             src={map.imageUrl}
             alt={map.name}
             fill
-            sizes="(max-width: 768px) 100vw, 33vw"
+            sizes="75vw"
             className="object-cover"
             unoptimized
           />
@@ -159,67 +147,64 @@ export function MapCard({ map }: MapCardProps) {
         </div>
       </div>
 
-      <CardHeader className="px-4 pt-4">
-        <CardTitle className="line-clamp-1">{map.name}</CardTitle>
-      </CardHeader>
-      <CardContent className="px-4">
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
-          {map.description ?? "No description"}
-        </p>
-      </CardContent>
-      <CardFooter className="flex flex-col gap-3 px-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild size="sm" variant="default">
+      <div className="flex w-full flex-col justify-between gap-4 border-t border-border p-4 md:w-2/5 md:border-l md:border-t-0 md:py-4">
+        <div className="min-w-0 space-y-1">
+          <h2 className="line-clamp-2 text-base font-semibold leading-tight">{map.name}</h2>
+          <p className="line-clamp-3 text-xs text-muted-foreground">
+            {map.description ?? "No description"}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Button asChild size="sm" variant="default" className="w-full justify-start">
             <Link href={`/editor/${map.id}`}>
-              <Pencil className="size-4" />
+              <Pencil className="size-4 shrink-0" />
               Edit
             </Link>
           </Button>
 
-          <Button asChild size="sm" variant="outline" disabled={!map.isPublished}>
+          <Button asChild size="sm" variant="outline" className="w-full justify-start" disabled={!map.isPublished}>
             <Link
               href={`/map/${map.id}`}
               target="_blank"
               aria-disabled={!map.isPublished}
               className={!map.isPublished ? "pointer-events-none opacity-50" : ""}
             >
-              <Eye className="size-4" />
+              <Eye className="size-4 shrink-0" />
               Buildings
             </Link>
           </Button>
 
-          <Button asChild size="sm" variant="outline" disabled={!map.isPublished}>
+          <Button asChild size="sm" variant="outline" className="w-full justify-start" disabled={!map.isPublished}>
             <Link
               href={`/map/${map.id}/iot`}
               target="_blank"
               aria-disabled={!map.isPublished}
               className={!map.isPublished ? "pointer-events-none opacity-50" : ""}
             >
-              <Eye className="size-4" />
+              <Eye className="size-4 shrink-0" />
               IoT
             </Link>
           </Button>
-        </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
           {map.isPublished ? (
-            <Button size="sm" variant="outline" onClick={handleCopyLink}>
-              {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+            <Button size="sm" variant="outline" className="w-full justify-start" onClick={handleCopyLink}>
+              {copied ? <Check className="size-4 shrink-0 text-emerald-600" /> : <Copy className="size-4 shrink-0" />}
               Buildings link
             </Button>
           ) : null}
 
           {map.isPublished ? (
-            <Button size="sm" variant="outline" onClick={handleCopyIotLink}>
-              {copiedIot ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+            <Button size="sm" variant="outline" className="w-full justify-start" onClick={handleCopyIotLink}>
+              {copiedIot ? <Check className="size-4 shrink-0 text-emerald-600" /> : <Copy className="size-4 shrink-0" />}
               IoT link
             </Button>
           ) : null}
 
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="destructive" aria-label="Delete map">
-                <Trash2 className="size-4" />
+              <Button size="sm" variant="destructive" className="w-full justify-start" aria-label="Delete map">
+                <Trash2 className="size-4 shrink-0" />
                 Delete
               </Button>
             </AlertDialogTrigger>
@@ -227,7 +212,8 @@ export function MapCard({ map }: MapCardProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete this map?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will permanently remove &quot;{map.name}&quot; and all of its buildings and devices. This cannot be undone.
+                  This will permanently remove &quot;{map.name}&quot; and all of its buildings and devices. This
+                  cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
 
@@ -268,8 +254,8 @@ export function MapCard({ map }: MapCardProps) {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
 

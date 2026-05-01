@@ -473,6 +473,10 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
     const client = connectMqttClient("wss://broker.hivemq.com:8884/mqtt");
     mqttRef.current = client;
     const ackTopic = `campus/${selectedMapId}/device/+/ota/ack`;
+
+    /** Suppress noisy errors when the browser tears down CONNECT/SUBSCRIBE mid-flight after tab switch */
+    const onError = (_err?: Error | Error[]) => {};
+
     const onMessage = (topic: string, payload: Uint8Array) => {
       if (!topic.endsWith("/ota/ack")) return;
       const parts = topic.split("/");
@@ -501,12 +505,23 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
         // ignore malformed payload
       }
     };
+
+    client.on("error", onError);
     client.on("message", onMessage);
-    void subscribeToTopic(client, ackTopic);
+    void subscribeToTopic(client, ackTopic).catch(() => {});
+
     return () => {
+      client.removeListener("error", onError);
       client.removeListener("message", onMessage);
-      client.unsubscribe(ackTopic);
-      disconnectMqttClient();
+      try {
+        client.unsubscribe(ackTopic, () => {
+          disconnectMqttClient();
+          if (mqttRef.current === client) mqttRef.current = null;
+        });
+      } catch {
+        disconnectMqttClient();
+        if (mqttRef.current === client) mqttRef.current = null;
+      }
     };
   }, [tab, selectedMapId]);
 
@@ -740,7 +755,7 @@ export function ProgrammingDashboard({ maps }: ProgrammingDashboardProps) {
         };
       };
 
-      const client = mqttRef.current ?? connectMqttClient(diagnostics.broker);
+      const client = connectMqttClient(diagnostics.broker);
       mqttRef.current = client;
       const topics = diagnostics.topics?.length ? diagnostics.topics : [diagnostics.topic];
       const payload = JSON.stringify(diagnostics.payload);

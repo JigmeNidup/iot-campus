@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Droplets, Lightbulb } from "lucide-react";
+import { Droplets, Lightbulb, Thermometer } from "lucide-react";
 import type { CampusMap, IotDevice } from "@/types";
 import { useMapTransform } from "@/hooks/useMapTransform";
 import { MapControls } from "@/components/map/MapControls";
@@ -47,12 +47,16 @@ export function IotMapView({
     offsetY: number;
   } | null>(null);
   const [hoveredDevice, setHoveredDevice] = useState<{
-    name: string;
-    type: "light" | "water_valve" | "temp_humidity";
-    state: boolean;
+    device: IotDevice;
     clientX: number;
     clientY: number;
   } | null>(null);
+
+  function deviceTypeLabel(type: IotDevice["type"]) {
+    if (type === "light") return "Light";
+    if (type === "water_valve") return "Water valve";
+    return "Temp / humidity";
+  }
 
   return (
     <div
@@ -93,7 +97,12 @@ export function IotMapView({
         <g transform={transform}>
           {devices.map((device) => {
             const isOn = device.state;
-            const Icon = device.type === "light" ? Lightbulb : Droplets;
+            const Icon =
+              device.type === "light"
+                ? Lightbulb
+                : device.type === "water_valve"
+                  ? Droplets
+                  : Thermometer;
             const activeColor = device.type === "light" ? "#f59e0b" : "#06b6d4";
             const fillColor = isOn ? activeColor : "#6b7280";
             const isSelected = selectedDeviceId === device.id;
@@ -105,9 +114,7 @@ export function IotMapView({
                 onPointerEnter={(e) => {
                   if (!showDeviceHoverTooltip) return;
                   setHoveredDevice({
-                    name: device.name,
-                    type: device.type,
-                    state: device.state,
+                    device,
                     clientX: e.clientX,
                     clientY: e.clientY,
                   });
@@ -131,17 +138,12 @@ export function IotMapView({
                     setHoveredDevice((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            name: device.name,
-                            type: device.type,
-                            state: device.state,
+                            device,
                             clientX: e.clientX,
                             clientY: e.clientY,
                           }
                         : {
-                            name: device.name,
-                            type: device.type,
-                            state: device.state,
+                            device,
                             clientX: e.clientX,
                             clientY: e.clientY,
                           },
@@ -165,7 +167,9 @@ export function IotMapView({
                   dragRef.current = null;
                 }}
                 onPointerLeave={() => {
-                  setHoveredDevice(null);
+                  setHoveredDevice((current) =>
+                    current && current.device.id === device.id ? null : current,
+                  );
                 }}
               >
                 <circle
@@ -225,17 +229,47 @@ export function IotMapView({
       />
       {showDeviceHoverTooltip && hoveredDevice ? (
         <div
-          className="pointer-events-none fixed z-50 rounded-md bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
+          className="pointer-events-none fixed z-50 max-w-sm rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
           style={{
             left: hoveredDevice.clientX + 12,
             top: hoveredDevice.clientY + 12,
           }}
         >
-          <div className="font-medium">{hoveredDevice.name}</div>
+          <div className="font-medium">{hoveredDevice.device.name}</div>
           <div className="text-muted-foreground">
-            {hoveredDevice.type === "light" ? "Light" : "Water Valve"} -{" "}
-            {hoveredDevice.state ? "ON" : "OFF"}
+            {deviceTypeLabel(hoveredDevice.device.type)}
+            {hoveredDevice.device.type === "temp_humidity" ? (
+              <>
+                {" "}
+                —{" "}
+                {hoveredDevice.device.temperature != null && hoveredDevice.device.humidity != null
+                  ? `${hoveredDevice.device.temperature.toFixed(1)}°C, ${hoveredDevice.device.humidity.toFixed(0)}% RH`
+                  : hoveredDevice.device.state
+                    ? "online"
+                    : "offline"}
+              </>
+            ) : (
+              <>
+                {" "}
+                — {hoveredDevice.device.state ? "ON" : "OFF"}
+              </>
+            )}
           </div>
+          {(hoveredDevice.device.firmwareVersion ||
+            hoveredDevice.device.boardTarget ||
+            hoveredDevice.device.otaStatus) && (
+            <div className="mt-1 space-y-0.5 border-t border-border pt-1 text-[10px] text-muted-foreground">
+              {hoveredDevice.device.boardTarget ? (
+                <div>Board: {hoveredDevice.device.boardTarget}</div>
+              ) : null}
+              {hoveredDevice.device.firmwareVersion ? (
+                <div>FW: {hoveredDevice.device.firmwareVersion}</div>
+              ) : null}
+              {hoveredDevice.device.otaStatus ? (
+                <div>OTA: {hoveredDevice.device.otaStatus}</div>
+              ) : null}
+            </div>
+          )}
         </div>
       ) : null}
     </div>

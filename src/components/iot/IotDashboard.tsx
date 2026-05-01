@@ -553,6 +553,7 @@ export function IotDashboard({ maps }: IotDashboardProps) {
                 setPinSelectedToTop(true);
               }}
               onPlaceDevice={createExternalDevice}
+              showDeviceHoverTooltip
             />
           )}
         </div>
