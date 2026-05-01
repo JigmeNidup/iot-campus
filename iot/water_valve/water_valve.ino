@@ -13,7 +13,6 @@ static const uint16_t MQTT_PORT = 1883;
 static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
 static const char* BASE_SERVER_URL = "http://localhost:3004";
 static const int VALVE_PIN = 4;
-static const int RESET_BUTTON_PIN = 0; // active-low, hold >3s to clear WiFi + topicPrefix
 
 Preferences prefs;
 WebServer portal(80);
@@ -30,34 +29,33 @@ bool configured = false;
 bool valveState = false;
 bool bootStatusSent = false;
 unsigned long lastStatusPublishMs = 0;
-bool resetHeld = false;
-unsigned long resetPressedAtMs = 0;
-bool resetTriggered = false;
+uint8_t resetBootCount = 0;
+bool resetBootCountArmed = false;
+unsigned long resetBootCountArmMs = 0;
+bool resetBootCountCleared = false;
 
-void clearConfig() {
-  prefs.begin("cfg", false);
-  prefs.putString("ssid", "");
-  prefs.putString("pass", "");
-  prefs.putString("prefix", "");
+static bool shouldEnterProvisioningByTripleReset() {
+  const esp_reset_reason_t reason = esp_reset_reason();
+  const unsigned long nowMs = millis();
+  (void)reason;
+
+  prefs.begin("rst", false);
+  resetBootCount = (uint8_t)prefs.getUChar("cnt", 0);
+  resetBootCount = (uint8_t)(resetBootCount + 1);
+  prefs.putUChar("cnt", resetBootCount);
   prefs.end();
-}
+  resetBootCountArmed = true;
+  resetBootCountArmMs = nowMs;
+  resetBootCountCleared = false;
 
-void handleResetButton() {
-  if (resetTriggered) return;
-  const bool pressed = digitalRead(RESET_BUTTON_PIN) == LOW;
-  if (pressed) {
-    if (!resetHeld) {
-      resetHeld = true;
-      resetPressedAtMs = millis();
-    } else if (millis() - resetPressedAtMs >= 3000) {
-      resetTriggered = true;
-      clearConfig();
-      delay(100);
-      ESP.restart();
-    }
-  } else {
-    resetHeld = false;
+  if (resetBootCount >= 3) {
+    prefs.begin("rst", false);
+    prefs.putUChar("cnt", 0);
+    prefs.end();
+    resetBootCountCleared = true;
+    return true;
   }
+  return false;
 }
 
 void loadFirmwareVersion() {
@@ -260,10 +258,15 @@ void connectMqtt() {
 }
 
 void setup() {
-  pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
   pinMode(VALVE_PIN, OUTPUT);
   setValve(false);
   loadFirmwareVersion();
+
+  if (shouldEnterProvisioningByTripleReset()) {
+    startProvisionPortal();
+    return;
+  }
+
   loadConfig();
   if (!configured) {
     startProvisionPortal();
@@ -282,7 +285,14 @@ void setup() {
 }
 
 void loop() {
-  handleResetButton();
+  if (resetBootCountArmed && !resetBootCountCleared && millis() - resetBootCountArmMs >= 3000) {
+    resetBootCountArmed = false;
+    prefs.begin("rst", false);
+    prefs.putUChar("cnt", 0);
+    prefs.end();
+    resetBootCountCleared = true;
+  }
+
   if (!configured) {
     portal.handleClient();
     return;

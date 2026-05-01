@@ -15,7 +15,6 @@ static const char* BASE_SERVER_URL = "http://localhost:3004";
 static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
 static const int DHT_PIN = 2;
 static const int DHT_TYPE = DHT11;
-static const int RESET_BUTTON_PIN = 0; // active-low, hold >3s to clear WiFi + topicPrefix (avoid holding during boot)
 
 ESP8266WebServer portal(80);
 WiFiClient wifiClient;
@@ -31,33 +30,39 @@ String firmwareVersion;
 bool configured = false;
 bool bootStatusSent = false;
 unsigned long lastPublishMs = 0;
-bool resetHeld = false;
-unsigned long resetPressedAtMs = 0;
-bool resetTriggered = false;
+uint8_t resetBootCount = 0;
+bool resetBootCountArmed = false;
+unsigned long resetBootCountArmMs = 0;
+bool resetBootCountCleared = false;
 
-void clearConfig() {
-  wifiSsid = "";
-  wifiPassword = "";
-  topicPrefix = "";
-  saveCfg(wifiSsid, wifiPassword, topicPrefix); // keeps firmwareVersion
+static uint8_t readResetBootCount() {
+  EEPROM.begin(1024);
+  uint8_t v = (uint8_t)EEPROM.read(1023);
+  EEPROM.end();
+  return v;
 }
 
-void handleResetButton() {
-  if (resetTriggered) return;
-  const bool pressed = digitalRead(RESET_BUTTON_PIN) == LOW;
-  if (pressed) {
-    if (!resetHeld) {
-      resetHeld = true;
-      resetPressedAtMs = millis();
-    } else if (millis() - resetPressedAtMs >= 3000) {
-      resetTriggered = true;
-      clearConfig();
-      delay(100);
-      ESP.restart();
-    }
-  } else {
-    resetHeld = false;
+static void writeResetBootCount(uint8_t v) {
+  EEPROM.begin(1024);
+  EEPROM.write(1023, v);
+  EEPROM.commit();
+  EEPROM.end();
+}
+
+static bool shouldEnterProvisioningByTripleReset() {
+  const unsigned long nowMs = millis();
+  resetBootCount = (uint8_t)(readResetBootCount() + 1);
+  writeResetBootCount(resetBootCount);
+  resetBootCountArmed = true;
+  resetBootCountArmMs = nowMs;
+  resetBootCountCleared = false;
+
+  if (resetBootCount >= 3) {
+    writeResetBootCount(0);
+    resetBootCountCleared = true;
+    return true;
   }
+  return false;
 }
 
 static String parseJsonStringField(const String& body, const char* field) {
@@ -230,8 +235,13 @@ void connectMqtt() {
 
 void setup() {
   dht.begin();
-  pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
   loadCfg();
+
+  if (shouldEnterProvisioningByTripleReset()) {
+    startPortal();
+    return;
+  }
+
   if (!configured) {
     startPortal();
     return;
@@ -243,7 +253,12 @@ void setup() {
 }
 
 void loop() {
-  handleResetButton();
+  if (resetBootCountArmed && !resetBootCountCleared && millis() - resetBootCountArmMs >= 3000) {
+    resetBootCountArmed = false;
+    writeResetBootCount(0);
+    resetBootCountCleared = true;
+  }
+
   if (!configured) {
     portal.handleClient();
     return;

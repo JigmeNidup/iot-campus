@@ -179,6 +179,22 @@ public/
 - Firmware artifacts are stored in `uploads/firmware` and indexed in `firmware_builds`.
 - OTA pushes are audit-logged in `ota_update_logs`.
 
+### Firmware templates (ESP32 + ESP-01)
+
+- **Base server URL**: firmware templates use `BASE_SERVER_URL` (default `http://localhost:3004`) to call:
+  - `POST /api/iot/register/complete`
+  - `POST /api/iot/status`
+- **Provisioning trigger**: on-device provisioning AP can be forced by **3 resets within ~3 seconds**.
+  - This **does not erase** stored WiFi/topic settings; the stored config is only overwritten when you submit new values in the AP portal.
+  - The reset counter is cleared when AP mode is entered, so **resetting while in AP mode returns to normal boot** (unless you triple-reset again).
+- **Firmware version**:
+  - Starts at **`v1.0.0`** by default.
+  - Updated and persisted **only after a successful OTA** (using the `version` field from the OTA command payload).
+- **OTA MQTT payload**: devices expect a small JSON body:
+  - `action`
+  - `url`
+  - `version`
+
 ---
 
 ## Uploads and static files
