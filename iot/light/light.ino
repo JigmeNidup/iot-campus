@@ -8,11 +8,11 @@
 #include <PubSubClient.h>
 
 static const char* DEVICE_TYPE = "light";
+static const char FW_VERSION_DEFAULT[] = "v1.0.0";
 static const char* MQTT_BROKER = "broker.hivemq.com";
 static const uint16_t MQTT_PORT = 1883;
 static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
-static const char* REG_COMPLETE_URL = "http://localhost:3004/api/iot/register/complete";
-static const char* STATUS_LOG_URL = "http://localhost:3004/api/iot/status";
+static const char* BASE_SERVER_URL = "http://localhost:3004";
 static const int LIGHT_PIN = 2;
 
 Preferences prefs;
@@ -25,17 +25,39 @@ String wifiPassword;
 String mapId;
 String deviceId;
 String topicPrefix;
-String firmwareVersion = "v1.0.0";
+String firmwareVersion;
 bool configured = false;
 bool lightState = false;
 bool bootStatusSent = false;
 unsigned long lastStatusPublishMs = 0;
 unsigned long lastOtaCheckMs = 0;
 
+void loadFirmwareVersion() {
+  prefs.begin("fw", true);
+  String v = prefs.getString("ver", "");
+  prefs.end();
+  firmwareVersion = (v.length() > 0) ? v : String(FW_VERSION_DEFAULT);
+}
+
+void saveFirmwareVersionNs(const String& ver) {
+  prefs.begin("fw", false);
+  prefs.putString("ver", ver);
+  prefs.end();
+}
+
+static String parseJsonStringField(const String& body, const char* field) {
+  String key = String('"') + field + "\":\"";
+  int idx = body.indexOf(key);
+  if (idx < 0) return "";
+  int start = idx + key.length();
+  int end = body.indexOf('"', start);
+  if (end <= start) return "";
+  return body.substring(start, end);
+}
+
 void setLight(bool on) {
   lightState = on;
   digitalWrite(LIGHT_PIN, on ? HIGH : LOW);
-  Serial.printf("[light] setLight -> %s\n", on ? "ON" : "OFF");
 }
 
 String commandTopic() { return topicPrefix + "/command"; }
@@ -77,24 +99,21 @@ void loadConfig() {
 
 bool completeRegistration() {
   if (WiFi.status() != WL_CONNECTED) return false;
-  Serial.println("[reg] Sending registration complete...");
   HTTPClient http;
-  http.begin(REG_COMPLETE_URL);
+  http.begin(String(BASE_SERVER_URL) + "/api/iot/register/complete");
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId + "\",\"deviceId\":\"" + deviceId + "\",\"registrationToken\":\"" + String(BASE_REGISTRATION_TOKEN) +
     "\",\"boardTarget\":\"esp32\",\"wifiSsid\":\"" + wifiSsid + "\",\"mqttTopicPrefix\":\"" + topicPrefix +
     "\",\"firmwareVersion\":\"" + firmwareVersion + "\"}";
   int code = http.POST(body);
   http.end();
-  Serial.printf("[reg] registration complete status: %d\n", code);
   return code >= 200 && code < 300;
 }
 
 bool sendBootStatusLog() {
   if (WiFi.status() != WL_CONNECTED) return false;
-  Serial.println("[boot-log] Sending boot status log...");
   HTTPClient http;
-  http.begin(STATUS_LOG_URL);
+  http.begin(String(BASE_SERVER_URL) + "/api/iot/status");
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId +
     "\",\"deviceId\":\"" + deviceId +
@@ -105,7 +124,6 @@ bool sendBootStatusLog() {
     "\",\"boardTarget\":\"esp32\"}";
   int code = http.POST(body);
   http.end();
-  Serial.printf("[boot-log] status code: %d\n", code);
   return code >= 200 && code < 300;
 }
 
@@ -140,31 +158,27 @@ void publishStatus() {
   char payload[192];
   snprintf(payload, sizeof(payload), "{\"type\":\"%s\",\"state\":%s,\"firmwareVersion\":\"%s\"}", DEVICE_TYPE, lightState ? "true" : "false", firmwareVersion.c_str());
   mqttClient.publish(statusTopic().c_str(), payload, false);
-  Serial.printf("[mqtt] publish status topic=%s payload=%s\n", statusTopic().c_str(), payload);
 }
 
-bool applyOtaFromUrl(const String& url) {
-  Serial.printf("[ota] Downloading firmware from: %s\n", url.c_str());
+bool applyOtaFromUrl(const String& url, const String& reportedVersion) {
   HTTPClient http;
   http.begin(url);
   int code = http.GET();
-  Serial.printf("[ota] HTTP GET code: %d\n", code);
   if (code != 200) { http.end(); return false; }
   int len = http.getSize();
-  Serial.printf("[ota] Content-Length: %d\n", len);
   WiFiClient* stream = http.getStreamPtr();
   if (!Update.begin(len > 0 ? (size_t)len : UPDATE_SIZE_UNKNOWN)) {
-    Serial.println("[ota] Update.begin failed");
     http.end();
     return false;
   }
   size_t written = Update.writeStream(*stream);
-  Serial.printf("[ota] Bytes written: %u\n", (unsigned int)written);
   bool ok = written > 0 && Update.end();
-  Serial.printf("[ota] Update.end result: %s\n", ok ? "OK" : "FAILED");
   http.end();
   if (ok && Update.isFinished()) {
-    Serial.println("[ota] Firmware update complete, rebooting...");
+    if (reportedVersion.length() > 0) {
+      saveFirmwareVersionNs(reportedVersion);
+      firmwareVersion = reportedVersion;
+    }
     mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"success\"}", false);
     delay(300);
     ESP.restart();
@@ -178,7 +192,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   for (unsigned int i = 0; i < length; i++) body += (char)payload[i];
 
   if (t == commandTopic()) {
-    Serial.printf("[mqtt] command message on %s: %s\n", t.c_str(), body.c_str());
     if (body.indexOf("\"state\":true") >= 0 || body == "ON") setLight(true);
     else if (body.indexOf("\"state\":false") >= 0 || body == "OFF") setLight(false);
     publishStatus();
@@ -186,7 +199,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   }
 
   if (t == otaTopic()) {
-    Serial.printf("[mqtt] ota message on %s: %s\n", t.c_str(), body.c_str());
     int idx = body.indexOf("\"url\":\"");
     int start = idx + 7;
     if (idx < 0) {
@@ -197,62 +209,44 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     int end = body.indexOf("\"", start);
     if (end <= start) return;
     String url = body.substring(start, end);
-    Serial.printf("[ota] Parsed firmware url: %s\n", url.c_str());
+    String ver = parseJsonStringField(body, "version");
     mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"downloading\"}", false);
-    bool ok = applyOtaFromUrl(url);
-    if (!ok) {
-      Serial.println("[ota] OTA failed");
+    bool otaOk = applyOtaFromUrl(url, ver);
+    if (!otaOk) {
       mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"failed\"}", false);
     }
   }
 }
 
 void connectWifi() {
-  Serial.printf("[wifi] Connecting to SSID: %s\n", wifiSsid.c_str());
   WiFi.mode(WIFI_STA);
   WiFi.begin(wifiSsid.c_str(), wifiPassword.c_str());
   unsigned long started = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - started < 20000) delay(500);
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("[wifi] Connected. IP=%s RSSI=%d\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
-  } else {
-    Serial.println("[wifi] Connection timeout");
-  }
 }
 
 void connectMqtt() {
-  Serial.printf("[mqtt] Connecting broker=%s:%u\n", MQTT_BROKER, MQTT_PORT);
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
   while (!mqttClient.connected()) {
     String clientId = "esp32-light-" + deviceId;
     if (mqttClient.connect(clientId.c_str())) {
-      Serial.printf("[mqtt] Connected. clientId=%s\n", clientId.c_str());
       mqttClient.subscribe(commandTopic().c_str());
       mqttClient.subscribe(otaTopic().c_str());
-      Serial.printf("[mqtt] Subscribed: %s and %s\n", commandTopic().c_str(), otaTopic().c_str());
       publishStatus();
     } else {
-      Serial.printf("[mqtt] Connect failed rc=%d, retrying...\n", mqttClient.state());
       delay(2000);
     }
   }
 }
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("\n[boot] ESP32 light firmware booting...");
   pinMode(LIGHT_PIN, OUTPUT);
   setLight(false);
 
+  loadFirmwareVersion();
   loadConfig();
-  Serial.printf("[boot] configured=%s mapId=%s deviceId=%s topicPrefix=%s\n",
-    configured ? "true" : "false",
-    mapId.c_str(),
-    deviceId.c_str(),
-    topicPrefix.c_str());
   if (!configured) {
-    Serial.println("[boot] Not configured, starting provisioning portal");
     startProvisionPortal();
     return;
   }
@@ -265,7 +259,6 @@ void setup() {
   connectMqtt();
   publishStatus();
   bootStatusSent = sendBootStatusLog();
-  Serial.printf("[boot] bootStatusSent=%s\n", bootStatusSent ? "true" : "false");
   lastStatusPublishMs = millis();
 }
 
@@ -280,7 +273,6 @@ void loop() {
   mqttClient.loop();
   if (!bootStatusSent && WiFi.status() == WL_CONNECTED) {
     bootStatusSent = sendBootStatusLog();
-    Serial.printf("[boot-log] retry result=%s\n", bootStatusSent ? "ok" : "failed");
   }
 
   if (millis() - lastStatusPublishMs > 30000) {

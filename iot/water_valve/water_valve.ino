@@ -7,11 +7,11 @@
 #include <PubSubClient.h>
 
 static const char* DEVICE_TYPE = "water_valve";
+static const char FW_VERSION_DEFAULT[] = "v1.0.0";
 static const char* MQTT_BROKER = "broker.hivemq.com";
 static const uint16_t MQTT_PORT = 1883;
 static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
-static const char* REG_COMPLETE_URL = "http://localhost:3004/api/iot/register/complete";
-static const char* STATUS_LOG_URL = "http://localhost:3004/api/iot/status";
+static const char* BASE_SERVER_URL = "http://localhost:3004";
 static const int VALVE_PIN = 4;
 
 Preferences prefs;
@@ -24,11 +24,34 @@ String wifiPassword;
 String mapId;
 String deviceId;
 String topicPrefix;
-String firmwareVersion = "v1.0.0";
+String firmwareVersion;
 bool configured = false;
 bool valveState = false;
 bool bootStatusSent = false;
 unsigned long lastStatusPublishMs = 0;
+
+void loadFirmwareVersion() {
+  prefs.begin("fw", true);
+  String v = prefs.getString("ver", "");
+  prefs.end();
+  firmwareVersion = (v.length() > 0) ? v : String(FW_VERSION_DEFAULT);
+}
+
+void saveFirmwareVersionNs(const String& ver) {
+  prefs.begin("fw", false);
+  prefs.putString("ver", ver);
+  prefs.end();
+}
+
+static String parseJsonStringField(const String& body, const char* field) {
+  String key = String('"') + field + "\":\"";
+  int idx = body.indexOf(key);
+  if (idx < 0) return "";
+  int start = idx + key.length();
+  int end = body.indexOf('"', start);
+  if (end <= start) return "";
+  return body.substring(start, end);
+}
 
 String commandTopic() { return topicPrefix + "/command"; }
 String statusTopic() { return topicPrefix + "/status"; }
@@ -75,7 +98,7 @@ void loadConfig() {
 bool completeRegistration() {
   if (WiFi.status() != WL_CONNECTED) return false;
   HTTPClient http;
-  http.begin(REG_COMPLETE_URL);
+  http.begin(String(BASE_SERVER_URL) + "/api/iot/register/complete");
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId + "\",\"deviceId\":\"" + deviceId + "\",\"registrationToken\":\"" + String(BASE_REGISTRATION_TOKEN) +
     "\",\"boardTarget\":\"esp32\",\"wifiSsid\":\"" + wifiSsid + "\",\"mqttTopicPrefix\":\"" + topicPrefix +
@@ -88,7 +111,7 @@ bool completeRegistration() {
 bool sendBootStatusLog() {
   if (WiFi.status() != WL_CONNECTED) return false;
   HTTPClient http;
-  http.begin(STATUS_LOG_URL);
+  http.begin(String(BASE_SERVER_URL) + "/api/iot/status");
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId +
     "\",\"deviceId\":\"" + deviceId +
@@ -135,7 +158,7 @@ void publishStatus() {
   mqttClient.publish(statusTopic().c_str(), payload, false);
 }
 
-bool applyOtaFromUrl(const String& url) {
+bool applyOtaFromUrl(const String& url, const String& reportedVersion) {
   HTTPClient http;
   http.begin(url);
   int code = http.GET();
@@ -147,6 +170,10 @@ bool applyOtaFromUrl(const String& url) {
   bool ok = written > 0 && Update.end();
   http.end();
   if (ok && Update.isFinished()) {
+    if (reportedVersion.length() > 0) {
+      saveFirmwareVersionNs(reportedVersion);
+      firmwareVersion = reportedVersion;
+    }
     mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"success\"}", false);
     delay(300);
     ESP.restart();
@@ -184,9 +211,10 @@ void connectMqtt() {
       int end = body.indexOf("\"", start);
       if (end <= start) return;
       String url = body.substring(start, end);
+      String ver = parseJsonStringField(body, "version");
       mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"downloading\"}", false);
-      bool ok = applyOtaFromUrl(url);
-      if (!ok) mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"failed\"}", false);
+      bool otaOk = applyOtaFromUrl(url, ver);
+      if (!otaOk) mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"failed\"}", false);
     }
   });
   while (!mqttClient.connected()) {
@@ -202,9 +230,9 @@ void connectMqtt() {
 }
 
 void setup() {
-  Serial.begin(115200);
   pinMode(VALVE_PIN, OUTPUT);
   setValve(false);
+  loadFirmwareVersion();
   loadConfig();
   if (!configured) {
     startProvisionPortal();

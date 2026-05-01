@@ -8,10 +8,10 @@
 #include <DHT.h>
 
 static const char* DEVICE_TYPE = "temp_humidity";
+static const char FW_VERSION_DEFAULT[] = "v1.0.0";
 static const char* MQTT_BROKER = "broker.hivemq.com";
 static const uint16_t MQTT_PORT = 1883;
-static const char* REG_COMPLETE_URL = "http://localhost:3004/api/iot/register/complete";
-static const char* STATUS_LOG_URL = "http://localhost:3004/api/iot/status";
+static const char* BASE_SERVER_URL = "http://localhost:3004";
 static const char* BASE_REGISTRATION_TOKEN = "campus-reg-token-dev";
 static const int DHT_PIN = 2;
 static const int DHT_TYPE = DHT11;
@@ -26,12 +26,21 @@ String wifiPassword;
 String mapId;
 String deviceId;
 String topicPrefix;
-String firmwareVersion = "v1.0.0";
+String firmwareVersion;
 bool configured = false;
 bool bootStatusSent = false;
 unsigned long lastPublishMs = 0;
 
-String commandTopic() { return topicPrefix + "/command"; }
+static String parseJsonStringField(const String& body, const char* field) {
+  String key = String('"') + field + "\":\"";
+  int idx = body.indexOf(key);
+  if (idx < 0) return "";
+  int start = idx + key.length();
+  int end = body.indexOf('"', start);
+  if (end <= start) return "";
+  return body.substring(start, end);
+}
+
 String statusTopic() { return topicPrefix + "/status"; }
 String otaTopic() { return topicPrefix + "/ota/update"; }
 
@@ -53,13 +62,14 @@ bool parseTopicPrefix(const String& prefix, String& outMapId, String& outDeviceI
 
 void saveCfg(const String& ssid, const String& pass, const String& prefix) {
   EEPROM.begin(1024);
-  String blob = ssid + "\n" + pass + "\n" + prefix + "\n";
+  String blob = ssid + "\n" + pass + "\n" + prefix + "\n" + firmwareVersion + "\n";
   for (int i = 0; i < 1023; i++) EEPROM.write(i, i < blob.length() ? blob[i] : 0);
   EEPROM.commit();
   EEPROM.end();
 }
 
 void loadCfg() {
+  firmwareVersion = String(FW_VERSION_DEFAULT);
   EEPROM.begin(1024);
   String blob = "";
   for (int i = 0; i < 1023; i++) {
@@ -75,6 +85,12 @@ void loadCfg() {
   wifiSsid = blob.substring(0, p1);
   wifiPassword = blob.substring(p1 + 1, p2);
   topicPrefix = blob.substring(p2 + 1, p3);
+  int p4 = blob.indexOf('\n', p3 + 1);
+  if (p4 >= 0) {
+    int p5 = blob.indexOf('\n', p4 + 1);
+    String fv = (p5 < 0) ? blob.substring(p4 + 1) : blob.substring(p4 + 1, p5);
+    if (fv.length() > 0) firmwareVersion = fv;
+  }
   configured = wifiSsid.length() > 0 && topicPrefix.length() > 0 && parseTopicPrefix(topicPrefix, mapId, deviceId);
 }
 
@@ -114,7 +130,7 @@ void publishSensorStatus(float temperature, float humidity) {
 bool sendBootStatusLog() {
   if (WiFi.status() != WL_CONNECTED) return false;
   HTTPClient http;
-  http.begin(STATUS_LOG_URL);
+  http.begin(String(BASE_SERVER_URL) + "/api/iot/status");
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId +
     "\",\"deviceId\":\"" + deviceId +
@@ -128,12 +144,16 @@ bool sendBootStatusLog() {
   return code >= 200 && code < 300;
 }
 
-void performOta(const String& url) {
+void performOta(const String& url, const String& ver) {
   WiFiClient client;
   ESPhttpUpdate.rebootOnUpdate(false);
   mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"flashing\"}", false);
   t_httpUpdate_return ret = ESPhttpUpdate.update(client, url);
   if (ret == HTTP_UPDATE_OK) {
+    if (ver.length() > 0) {
+      firmwareVersion = ver;
+      saveCfg(wifiSsid, wifiPassword, topicPrefix);
+    }
     mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"success\"}", false);
     delay(300);
     ESP.restart();
@@ -142,8 +162,44 @@ void performOta(const String& url) {
   }
 }
 
+void connectWifi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(wifiSsid.c_str(), wifiPassword.c_str());
+  unsigned long started = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - started < 20000) delay(500);
+}
+
+void connectMqtt() {
+  mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient.setCallback([](char* topic, byte* payload, unsigned int length) {
+    String t = String(topic);
+    String body = "";
+    for (unsigned int i = 0; i < length; i++) body += (char)payload[i];
+    if (t == otaTopic()) {
+      int idx = body.indexOf("\"url\":\"");
+      int start = idx + 7;
+      if (idx < 0) {
+        idx = body.indexOf("\"downloadUrl\":\"");
+        start = idx + 15;
+      }
+      if (idx < 0) return;
+      int end = body.indexOf("\"", start);
+      if (end <= start) return;
+      String url = body.substring(start, end);
+      String otaVer = parseJsonStringField(body, "version");
+      mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"downloading\"}", false);
+      performOta(url, otaVer);
+    }
+  });
+  while (!mqttClient.connected()) {
+    String clientId = "esp01-temphumi-" + deviceId;
+    if (mqttClient.connect(clientId.c_str())) {
+      mqttClient.subscribe(otaTopic().c_str());
+    } else delay(2000);
+  }
+}
+
 void setup() {
-  Serial.begin(115200);
   dht.begin();
   loadCfg();
   if (!configured) {
@@ -172,10 +228,8 @@ void loop() {
     lastPublishMs = millis();
 
     float humidity = dht.readHumidity();
-    float temperature = dht.readTemperature(); // Celsius
-
+    float temperature = dht.readTemperature();
     if (isnan(humidity) || isnan(temperature)) {
-      Serial.println("[DHT11] Failed to read sensor data");
       return;
     }
 
@@ -183,46 +237,9 @@ void loop() {
   }
 }
 
-void connectWifi() {
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiSsid.c_str(), wifiPassword.c_str());
-  unsigned long started = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - started < 20000) delay(500);
-}
-
-void connectMqtt() {
-  mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-  mqttClient.setCallback([](char* topic, byte* payload, unsigned int length) {
-    String t = String(topic);
-    String body = "";
-    for (unsigned int i = 0; i < length; i++) body += (char)payload[i];
-    if (t == otaTopic()) {
-      int idx = body.indexOf("\"url\":\"");
-      int start = idx + 7;
-      if (idx < 0) {
-        idx = body.indexOf("\"downloadUrl\":\"");
-        start = idx + 15;
-      }
-      if (idx < 0) return;
-      int end = body.indexOf("\"", start);
-      if (end <= start) return;
-      String url = body.substring(start, end);
-      mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"downloading\"}", false);
-      performOta(url);
-    }
-  });
-  while (!mqttClient.connected()) {
-    String clientId = "esp01-temphumi-" + deviceId;
-    if (mqttClient.connect(clientId.c_str())) {
-      mqttClient.subscribe(commandTopic().c_str());
-      mqttClient.subscribe(otaTopic().c_str());
-    } else delay(2000);
-  }
-}
-
-void __attribute__((unused)) registerComplete() {
+void registerComplete() {
   HTTPClient http;
-  http.begin(REG_COMPLETE_URL);
+  http.begin(String(BASE_SERVER_URL) + "/api/iot/register/complete");
   http.addHeader("Content-Type", "application/json");
   String body = "{\"mapId\":\"" + mapId + "\",\"deviceId\":\"" + deviceId + "\",\"registrationToken\":\"" + String(BASE_REGISTRATION_TOKEN) +
     "\",\"boardTarget\":\"esp01\",\"wifiSsid\":\"" + wifiSsid + "\",\"mqttTopicPrefix\":\"" + topicPrefix +
