@@ -1,7 +1,8 @@
 {
-  "name": "campus-map",
+  "name": "smart-campus",
   "version": "0.1.0",
   "private": true,
+  "description": "Smart Campus — interactive campus maps, IoT overlays, ESP firmware tooling, and public map views.",
   "scripts": {
     "dev": "next dev -p 3004",
     "build": "next build",

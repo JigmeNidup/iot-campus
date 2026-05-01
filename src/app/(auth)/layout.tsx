@@ -14,13 +14,13 @@ export default function AuthLayout({
       >
         <Image
           src="/logo.png"
-          alt="Campus Map logo"
+          alt="Smart Campus logo"
           width={28}
           height={28}
           className="size-7 rounded-md object-contain"
           priority
         />
-        <span>Campus Map</span>
+        <span>Smart Campus</span>
       </Link>
       <div className="w-full max-w-sm">{children}</div>
     </div>

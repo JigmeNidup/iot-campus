@@ -5,7 +5,7 @@ import { OperatorDashboard } from "@/components/operator/OperatorDashboard";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Operator Dashboard - Campus Map" };
+export const metadata = { title: "Operator Dashboard - Smart Campus" };
 
 export default async function OperatorPage() {
   const session = await auth();

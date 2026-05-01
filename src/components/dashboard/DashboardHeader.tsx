@@ -26,23 +26,23 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-14 items-center justify-between px-6">
+      <div className="flex h-14 w-full items-center px-4 sm:px-6">
         <Link
           href={homeHref}
-          className="flex items-center gap-2 font-semibold"
+          className="flex shrink-0 items-center gap-2 text-left font-semibold"
         >
           <Image
             src="/logo.png"
-            alt="Campus Map logo"
+            alt="Smart Campus logo"
             width={28}
             height={28}
             className="size-7 rounded-md object-contain"
             priority
           />
-          <span>Campus Map</span>
+          <span>Smart Campus</span>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
           {isAdmin ? (
             <>
               <Button asChild size="sm" variant="outline">

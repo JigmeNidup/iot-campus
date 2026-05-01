@@ -5,7 +5,7 @@ import { ProgrammingDashboard } from "@/components/programming/ProgrammingDashbo
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Programming - Campus Map" };
+export const metadata = { title: "Programming - Smart Campus" };
 
 type MapSelectorRow = {
   id: string;

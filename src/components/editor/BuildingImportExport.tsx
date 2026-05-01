@@ -81,7 +81,7 @@ export function BuildingImportExport() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${slugify(meta.name) || "campus-map"}-buildings.json`;
+    a.download = `${slugify(meta.name) || "smart-campus"}-buildings.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();

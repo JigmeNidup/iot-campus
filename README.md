@@ -1,6 +1,6 @@
-# Campus Map
+# Smart Campus
 
-Full-stack interactive campus map application. Upload a map image, draw building polygons over it, attach metadata (categories, departments, floors, images, descriptions), and publish a polished public view with search, filters, and zoom.
+Full-stack interactive campus platform: campus maps with building polygons and metadata, IoT device overlays with MQTT, programming and OTA workflows for ESP boards, plus published public views (buildings-only or full IoT).
 
 Built with **Next.js 16 (App Router)**, **TypeScript** (strict mode), **Tailwind CSS v4**, **shadcn/ui**, **PostgreSQL** (`pg`, parameterized queries), **NextAuth v5** (Credentials, JWT), **Zustand**, **Zod**, and **Sonner**.
 

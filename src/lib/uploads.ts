@@ -1,6 +1,6 @@
 import path from "node:path";
 
-export const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+export const UPLOAD_DIR = path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads");
 
 export const FILE_API_PREFIX = "/api/files";
 

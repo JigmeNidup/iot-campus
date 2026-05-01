@@ -21,17 +21,17 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { mapId } = await params;
-  if (!UUID_RE.test(mapId)) return { title: "Map - Campus Map" };
+  if (!UUID_RE.test(mapId)) return { title: "Map - Smart Campus" };
   try {
     const result = await query<{ name: string; is_published: boolean }>(
       "SELECT name, is_published FROM campus_maps WHERE id = $1",
       [mapId],
     );
     const row = result.rows[0];
-    if (!row || !row.is_published) return { title: "Map - Campus Map" };
-    return { title: `${row.name} - Campus Map` };
+    if (!row || !row.is_published) return { title: "Map - Smart Campus" };
+    return { title: `${row.name} - Smart Campus` };
   } catch {
-    return { title: "Map - Campus Map" };
+    return { title: "Map - Smart Campus" };
   }
 }
 

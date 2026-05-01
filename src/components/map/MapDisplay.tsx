@@ -173,7 +173,7 @@ export function MapDisplay({ map, initialDevices, showIot = true }: MapDisplayPr
         >
           <Image
             src="/logo.png"
-            alt="Campus Map logo"
+            alt="Smart Campus logo"
             width={28}
             height={28}
             className="size-7 shrink-0 rounded-md object-contain"

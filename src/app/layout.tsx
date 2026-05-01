@@ -5,8 +5,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
-  title: "Campus Map",
-  description: "Interactive campus map editor and viewer",
+  title: "Smart Campus",
+  description:
+    "Interactive campus maps with building metadata, IoT device overlays, and firmware programming tools.",
 };
 
 export default function RootLayout({

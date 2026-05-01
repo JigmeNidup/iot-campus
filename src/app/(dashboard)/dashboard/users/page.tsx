@@ -4,7 +4,7 @@ import { UserManagement } from "@/components/dashboard/UserManagement";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Users - Campus Map" };
+export const metadata = { title: "Users - Smart Campus" };
 
 export default async function UsersPage() {
   const session = await auth();

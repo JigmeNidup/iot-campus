@@ -248,7 +248,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`${c.bold}Campus Map :: database setup${c.reset}\n`);
+  console.log(`${c.bold}Smart Campus :: database setup${c.reset}\n`);
   step(`connecting to ${maskUrl(url)}`);
   const pool = new Pool({ connectionString: url });
 

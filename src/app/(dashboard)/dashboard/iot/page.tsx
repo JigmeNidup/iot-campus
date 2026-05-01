@@ -5,7 +5,7 @@ import { IotDashboard } from "@/components/iot/IotDashboard";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "IoT Dashboard - Campus Map" };
+export const metadata = { title: "IoT Dashboard - Smart Campus" };
 
 type MapSelectorRow = {
   id: string;

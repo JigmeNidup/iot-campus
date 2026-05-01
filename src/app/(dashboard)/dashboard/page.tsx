@@ -7,7 +7,7 @@ import { DashboardMapsSection } from "@/components/dashboard/DashboardMapsSectio
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Dashboard - Campus Map" };
+export const metadata = { title: "Dashboard - Smart Campus" };
 
 export default async function DashboardPage() {
   const session = await auth();
