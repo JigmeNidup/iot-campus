@@ -2,10 +2,13 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
+#include <WiFiClientSecureBearSSL.h>
 #include <EEPROM.h>
 // ESP-01 RAM is tight — 1200 still fits typical OTA URL + checksum JSON payload.
 #define MQTT_MAX_PACKET_SIZE 1200
 #include <PubSubClient.h>
+
+#define DEBUG_SERIAL 0
 
 static const char* DEVICE_TYPE = "light";
 static const char FW_VERSION_DEFAULT[] = "v1.0.0";
@@ -52,7 +55,8 @@ static void writeResetBootCount(uint8_t v) {
 
 static bool shouldEnterProvisioningByTripleReset() {
   const unsigned long nowMs = millis();
-  resetBootCount = (uint8_t)(readResetBootCount() + 1);
+  const uint8_t prev = readResetBootCount();
+  resetBootCount = (uint8_t)(prev + 1);
   writeResetBootCount(resetBootCount);
   resetBootCountArmed = true;
   resetBootCountArmMs = nowMs;
@@ -136,13 +140,40 @@ void loadCfg() {
 }
 
 void startPortal() {
+  // Force portal mode even if config exists.
+  configured = false;
+  WiFi.disconnect();
   WiFi.mode(WIFI_AP);
   WiFi.softAP("ESP01LightSetup");
   portal.on("/", HTTP_GET, []() {
-    portal.send(200, "text/html",
-      "<html><body><h3>ESP-01 Light Setup</h3><form method='POST' action='/save'>"
-      "SSID:<input name='ssid'/><br/>Password:<input name='pass'/><br/>Topic Prefix:<input name='prefix'/><br/>"
-      "<button type='submit'>Save</button></form></body></html>");
+    portal.send(
+      200,
+      "text/html",
+      "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'/>"
+      "<title>ESP-01 Light Setup</title>"
+      "<style>"
+      "body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b1220;color:#e5e7eb}"
+      ".card{max-width:520px;margin:24px auto;padding:20px;border:1px solid #1f2937;border-radius:14px;background:#0f172a}"
+      "h2{margin:0 0 6px;font-size:18px}"
+      "p{margin:0 0 14px;color:#9ca3af;font-size:13px;line-height:1.35}"
+      "label{display:block;margin:10px 0 6px;font-size:12px;color:#cbd5e1}"
+      "input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#e5e7eb}"
+      "button{margin-top:14px;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2563eb;background:#2563eb;color:white;font-weight:600}"
+      ".hint{margin-top:12px;font-size:12px;color:#9ca3af}"
+      ".mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}"
+      "</style></head><body>"
+      "<div class='card'>"
+      "<h2>ESP-01 Light Setup</h2>"
+      "<p>Enter WiFi and MQTT topic prefix to provision this device.</p>"
+      "<form method='POST' action='/save'>"
+      "<label>WiFi SSID</label><input name='ssid' placeholder='WiFi name'/>"
+      "<label>WiFi Password</label><input name='pass' type='password' placeholder='WiFi password'/>"
+      "<label>MQTT Topic Prefix</label><input class='mono' name='prefix' placeholder='campus/&lt;mapId&gt;/device/&lt;deviceId&gt;'/>"
+      "<button type='submit'>Save &amp; reboot</button>"
+      "</form>"
+      "<div class='hint'>Example prefix: <span class='mono'>campus/123/device/abc</span></div>"
+      "</div></body></html>"
+    );
   });
   portal.on("/save", HTTP_POST, []() {
     String ssid = portal.arg("ssid");
@@ -187,10 +218,20 @@ bool sendBootStatusLog() {
 }
 
 void performOta(const String& url, const String& ver) {
-  WiFiClient client;
   ESPhttpUpdate.rebootOnUpdate(false);
+  ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
   mqttClient.publish((topicPrefix + "/ota/ack").c_str(), "{\"status\":\"flashing\"}", false);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(client, url);
+  t_httpUpdate_return ret;
+  if (url.startsWith("https://")) {
+    BearSSL::WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    ret = ESPhttpUpdate.update(secureClient, url);
+  } else {
+    WiFiClient client;
+    ret = ESPhttpUpdate.update(client, url);
+  }
+
   if (ret == HTTP_UPDATE_OK) {
     if (ver.length() > 0) {
       firmwareVersion = ver;
@@ -208,6 +249,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String t = String(topic);
   String body = "";
   for (unsigned int i = 0; i < length; i++) body += (char)payload[i];
+
   if (t == commandTopic()) {
     if (body.indexOf("\"state\":true") >= 0 || body == "ON") setLight(true);
     else if (body.indexOf("\"state\":false") >= 0 || body == "OFF") setLight(false);

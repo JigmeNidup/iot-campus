@@ -190,6 +190,7 @@ public/
   - Implementation detail:
     - **ESP32**: uses `Preferences` (namespace `"rst"`, key `"cnt"`) as a boot counter that auto-clears after ~3 seconds of uptime.
     - **ESP-01**: uses a single EEPROM byte at address **1023** as the same boot counter (auto-clears after ~3 seconds of uptime).
+- **Provisioning UI**: the AP portal uses a simple mobile-friendly form UI (SSID, password, topic prefix) on both ESP32 and ESP-01 templates.
 - **Firmware version**:
   - Starts at **`v1.0.0`** by default.
   - Updated and persisted **only after a successful OTA** (using the `version` field from the OTA command payload).

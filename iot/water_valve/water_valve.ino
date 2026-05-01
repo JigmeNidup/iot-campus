@@ -157,10 +157,34 @@ void startProvisionPortal() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP("CampusValveSetup");
   portal.on("/", HTTP_GET, []() {
-    portal.send(200, "text/html",
-      "<html><body><h3>Water Valve Provisioning</h3><form method='POST' action='/save'>"
-      "SSID:<input name='ssid'/><br/>Password:<input name='pass'/><br/>Topic Prefix:<input name='prefix'/><br/>"
-      "<button type='submit'>Save</button></form></body></html>");
+    portal.send(
+      200,
+      "text/html",
+      "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'/>"
+      "<title>ESP32 Water Valve Setup</title>"
+      "<style>"
+      "body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b1220;color:#e5e7eb}"
+      ".card{max-width:520px;margin:24px auto;padding:20px;border:1px solid #1f2937;border-radius:14px;background:#0f172a}"
+      "h2{margin:0 0 6px;font-size:18px}"
+      "p{margin:0 0 14px;color:#9ca3af;font-size:13px;line-height:1.35}"
+      "label{display:block;margin:10px 0 6px;font-size:12px;color:#cbd5e1}"
+      "input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#e5e7eb}"
+      "button{margin-top:14px;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2563eb;background:#2563eb;color:white;font-weight:600}"
+      ".hint{margin-top:12px;font-size:12px;color:#9ca3af}"
+      ".mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}"
+      "</style></head><body>"
+      "<div class='card'>"
+      "<h2>ESP32 Water Valve Setup</h2>"
+      "<p>Enter WiFi and MQTT topic prefix to provision this device.</p>"
+      "<form method='POST' action='/save'>"
+      "<label>WiFi SSID</label><input name='ssid' placeholder='WiFi name'/>"
+      "<label>WiFi Password</label><input name='pass' type='password' placeholder='WiFi password'/>"
+      "<label>MQTT Topic Prefix</label><input class='mono' name='prefix' placeholder='campus/&lt;mapId&gt;/device/&lt;deviceId&gt;'/>"
+      "<button type='submit'>Save &amp; reboot</button>"
+      "</form>"
+      "<div class='hint'>Example prefix: <span class='mono'>campus/123/device/abc</span></div>"
+      "</div></body></html>"
+    );
   });
   portal.on("/save", HTTP_POST, []() {
     String ssid = portal.arg("ssid");
